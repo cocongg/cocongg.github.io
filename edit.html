@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>节目制作资源申请管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cocongg.github.io/styles.css">
+</head>
+<body>
+    <div id="page-home" class="page active">
+        <div class="container">
+            <div class="header">
+                <h1>节目制作资源申请管理系统</h1>
+                <div id="cloudStatus" class="cloud-status">📦 本地模式</div>
+            </div>
+
+            <div class="options">
+                <div class="option-card" onclick="selectOption('studio')">
+                    <div class="icon-wrapper icon-studio" style="width: 80px; height: 80px; font-size: 40px;">🎬</div>
+                    <div class="option-content">
+                        <h3 style="font-size: 20px;">综艺演播室</h3>
+                        <p style="font-size: 14px; color: #999; margin-top: 6px;">开放800演播室、1800演播室</p>
+                        <div class="click-hint">点击预约</div>
+                    </div>
+                </div>
+
+                <div class="option-card" onclick="selectOption('nanDaTang')">
+                    <div class="icon-wrapper icon-live" style="width: 80px; height: 80px; font-size: 40px;">🏛️</div>
+                    <div class="option-content">
+                        <h3 style="font-size: 20px;">南大堂</h3>
+                        <div class="click-hint">点击选择</div>
+                    </div>
+                </div>
+
+                <div class="option-card" onclick="selectOption('outside')">
+                    <div class="icon-wrapper icon-outside" style="width: 80px; height: 80px; font-size: 40px;">🎥</div>
+                    <div class="option-content">
+                        <h3 style="font-size: 20px;">外场转播</h3>
+                        <div class="click-hint">点击预约</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <div class="section-title" style="margin-bottom: 0;">预约排期表</div>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="downloadScheduleExcel()" style="padding: 8px 20px; font-size: 14px; margin-right: 10px;">📥 下载排期表</button>
+                    <button type="button" class="btn btn-primary" onclick="showStatistics()" style="padding: 8px 20px; font-size: 14px; margin-right: 10px;">📊 数据统计</button>
+                    <button type="button" class="btn btn-primary" onclick="showTaskSheet()" style="padding: 8px 20px; font-size: 14px;">📋 任务单</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>800演播室</th>
+                            <th>1800演播室</th>
+                            <th>南大堂</th>
+                            <th>外场转播活动</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scheduleBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
+
+    <div id="page-reserve" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1 id="reserveTitle">预约申请</h1>
+                <p id="reserveSubtitle">请填写预约信息，可选择多个日期</p>
+            </div>
+
+            <form id="reserveForm">
+                <input type="hidden" name="editId">
+                <div class="form-section">
+                    <div class="section-title">基本信息</div>
+                    <div class="form-group">
+                        <label>节目名称 *</label>
+                        <input type="text" name="programName" required placeholder="请输入节目名称">
+                    </div>
+                    <div class="form-group" id="projectLocationGroup" style="display: none;">
+                        <label>项目地点</label>
+                        <input type="text" name="projectLocation" placeholder="请输入项目地点">
+                    </div>
+                    <div class="form-group">
+                        <label>部门 *</label>
+                        <input type="text" name="department" required placeholder="请输入部门名称">
+                    </div>
+                    <div class="form-group">
+                        <label>申请人 *</label>
+                        <input type="text" name="applicant" required placeholder="请输入申请人姓名">
+                    </div>
+                    <div class="form-group" id="broadcastSystemGroup" style="display: none;">
+                        <label>转播系统</label>
+                        <input type="text" name="broadcastSystem" placeholder="请输入转播系统">
+                    </div>
+                    <div class="form-group">
+                        <label>预约日期 *</label>
+                        <input type="hidden" id="datesHidden" name="dates">
+                        <div class="dates-select" id="datesSelect">
+                            <input type="date" id="dateInput" style="display: none;">
+                            <button type="button" class="add-date-btn" onclick="addDate()">+ 添加日期</button>
+                            <button type="button" class="add-date-btn" onclick="showDateRangeModal()" style="margin-left: 8px;">📅 连续多日</button>
+                        </div>
+                        <div id="selectedDates" class="dates-select"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>其他</label>
+                        <textarea name="other" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-section" id="studioSelectSection">
+                    <div class="section-title">演播室选择 *</div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="studio" value="800">
+                                <span>800</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="studio" value="1800">
+                                <span>1800</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm" id="reserveSubmitBtn" disabled>确认预约</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-task" class="page">
+        <div class="container" style="max-width: 1600px;">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>任务单</h1>
+                <p id="taskWeekLabel">任务单周次</p>
+            </div>
+
+            <div class="task-toolbar">
+                <div class="task-stat">
+                    <div class="task-stat-item">已确认节目：<strong id="taskFilledCount">0</strong></div>
+                    <div class="task-stat-item">涉及日期：<strong id="taskDateCount">0</strong></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="week-switch-group">
+                        <button type="button" class="week-switch-btn" id="taskCurrentWeekBtn" onclick="changeTaskWeek('current')">本周任务单</button>
+                        <button type="button" class="week-switch-btn" id="taskNextWeekBtn" onclick="changeTaskWeek('next')">下周任务单</button>
+                    </div>
+                    <input type="text" id="taskSearchInput" placeholder="搜索节目名/部门/申请人" oninput="searchTaskSheet()" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; width: 220px;">
+                    <button type="button" class="btn btn-primary" onclick="showShiftBoard()" style="padding: 8px 20px; font-size: 14px;">👥 部门排班</button>
+                    <button type="button" class="btn btn-primary" onclick="addOtherService()" style="padding: 8px 20px; font-size: 14px;">➕ 添加其他服务</button>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <button type="button" class="btn btn-primary" onclick="generateCurrentWeeklyTaskSheet()" style="padding: 8px 20px; font-size: 14px; white-space: nowrap;">📅 生成本周任务单</button>
+                        <button type="button" class="btn btn-primary" onclick="generateWeeklyTaskSheet()" style="padding: 8px 20px; font-size: 14px; white-space: nowrap;">📅 生成下周任务单</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container" id="taskSheetContainer">
+                <table class="task-sheet-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>800演播室</th>
+                            <th>1800演播室</th>
+                            <th>南大堂</th>
+                            <th>4K车</th>
+                            <th>高清车</th>
+                            <th>4K EFP</th>
+                            <th>高清EFP</th>
+                            <th>简易EFP</th>
+                            <th>其他服务</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskSheetBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-statistics" class="page">
+        <div class="container" style="max-width: 1400px;">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>数据统计</h1>
+                <p>当前数据统计分析</p>
+            </div>
+
+            <div id="statisticsContent">
+                <p style="text-align: center; color: #999; padding: 40px;">加载中...</p>
+            </div>
+
+            <div class="header" style="margin-top: 40px;">
+                <h2>历史数据归档</h2>
+                <p>查看历史保存的数据快照</p>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <button type="button" class="btn btn-primary" onclick="loadHistoryList()" style="padding: 8px 20px; font-size: 14px;">🔄 刷新历史列表</button>
+            </div>
+
+            <div id="historyList" style="margin-top: 16px;">
+                <p style="text-align: center; color: #999; padding: 20px;">点击上方按钮加载历史归档列表</p>
+            </div>
+
+            <div id="historyDetail" style="margin-top: 24px;"></div>
+        </div>
+    </div>
+
+    <div id="dateRangeModal" class="modal-overlay stacked-modal" style="display: none;">
+        <div class="modal-content date-range-modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3>选择连续日期</h3>
+                <button type="button" class="btn-close" onclick="closeDateRangeModal()">×</button>
+            </div>
+            <div class="form-section">
+                <div class="form-group">
+                    <label>开始日期 *</label>
+                    <input type="date" id="rangeStart">
+                </div>
+                <div class="form-group">
+                    <label>结束日期 *</label>
+                    <input type="date" id="rangeEnd">
+                </div>
+                <p id="rangePreview" style="font-size: 13px; color: #666; margin-top: 8px;"></p>
+            </div>
+            <div class="btn-container">
+                <button type="button" class="btn btn-secondary" onclick="closeDateRangeModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmDateRange()">确定添加</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="otherServiceModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content other-service-modal-content">
+            <div class="modal-header">
+                <h3 id="otherServiceModalTitle">添加其他服务</h3>
+                <button type="button" class="btn-close" onclick="closeOtherServiceModal()">×</button>
+            </div>
+            <form id="otherServiceForm">
+                <input type="hidden" name="editId" id="otherServiceEditId">
+                <div class="form-section">
+                    <div class="form-group">
+                        <label>服务日期 *</label>
+                        <input type="hidden" name="dates" id="otherServiceDatesHidden">
+                        <div class="other-service-date-toolbar">
+                            <input type="date" id="otherServiceDateInput" class="inline-date-input" style="display: none;">
+                            <button type="button" class="add-date-btn" onclick="addDate('otherService')">+ 添加日期</button>
+                            <button type="button" class="add-date-btn" onclick="showDateRangeModal('otherService')">📅 连续多日</button>
+                        </div>
+                        <div id="otherServiceSelectedDates" class="dates-select dates-panel"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>节目名称</label>
+                        <input type="text" name="programName" required placeholder="请输入节目名称">
+                    </div>
+                    <div class="form-group">
+                        <label>申请人</label>
+                        <input type="text" name="applicant" required placeholder="请输入申请人">
+                    </div>
+                    <div class="form-group">
+                        <label>服务明细</label>
+                        <textarea name="serviceDetails" rows="4" placeholder="请输入服务明细"></textarea>
+                    </div>
+                </div>
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="closeOtherServiceModal()">取消</button>
+                    <button type="submit" class="btn btn-confirm" id="otherServiceSubmitBtn">确认添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-studio" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>综艺演播室申请单</h1>
+                <p>节目：<span id="currentProgramName"></span></p>
+            </div>
+
+            <form id="studioForm">
+                <div class="form-section">
+                    <div class="section-title">模式选择</div>
+                    <div class="form-group">
+                        <label class="checkbox-item" style="width: auto; min-width: 150px;">
+                            <input type="checkbox" name="visitMode" id="visitMode" onchange="toggleVisitMode()">
+                            <span>参观模式</span>
+                            <span style="font-size: 12px; color: #94a3b8; font-weight: normal; margin-left: 8px;">勾选后无需填写流程安排和设备需求</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-section" id="flowSection">
+                    <div class="section-title">流程安排</div>
+                    <div class="flow-items" id="flowItems">
+                        <div class="flow-item" data-flow="装台">
+                            <div class="flow-header">
+                                <span class="flow-name">装台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('装台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-装台"></div>
+                        </div>
+                        <div class="flow-item" data-flow="场地">
+                            <div class="flow-header">
+                                <span class="flow-name">场地</span>
+                                <span class="flow-desc">（包含场地）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('场地')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-场地"></div>
+                        </div>
+                        <div class="flow-item" data-flow="装调灯">
+                            <div class="flow-header">
+                                <span class="flow-name">装调灯</span>
+                                <span class="flow-desc">（包含场地、灯光）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('装调灯')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-装调灯"></div>
+                        </div>
+                        <div class="flow-item" data-flow="不带机彩排">
+                            <div class="flow-header">
+                                <span class="flow-name">不带机彩排</span>
+                                <span class="flow-desc">（包含场地、灯光、音响）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('不带机彩排')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-不带机彩排"></div>
+                        </div>
+                        <div class="flow-item" data-flow="带机彩排">
+                            <div class="flow-header">
+                                <span class="flow-name">带机彩排</span>
+                                <span class="flow-desc">（包含场地、灯光、音响、视讯）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('带机彩排')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-带机彩排"></div>
+                        </div>
+                        <div class="flow-item" data-flow="录制">
+                            <div class="flow-header">
+                                <span class="flow-name">录制</span>
+                                <span class="flow-desc">（包含场地、灯光、音响、视讯）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('录制')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-录制"></div>
+                        </div>
+                        <div class="flow-item" data-flow="直播">
+                            <div class="flow-header">
+                                <span class="flow-name">直播</span>
+                                <span class="flow-desc">（包含场地、灯光、音响、视讯）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('直播')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-直播"></div>
+                        </div>
+                        <div class="flow-item" data-flow="拆台">
+                            <div class="flow-header">
+                                <span class="flow-name">拆台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('拆台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-拆台"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section" id="equipmentSection">
+                    <div class="section-title">设备需求</div>
+                    <div class="form-group">
+                        <label>摄像机数 *</label>
+                        <div class="number-input">
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, -1)">-</button>
+                            <input type="number" name="cameraCount" value="6" min="0" max="20" required>
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>是否需要摇臂 *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="是" required>
+                                <span class="radio-btn"></span>
+                                <span>是</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="否" required>
+                                <span class="radio-btn"></span>
+                                <span>否</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>是否需要屏控 *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="screenControl" value="是" required>
+                                <span class="radio-btn"></span>
+                                <span>是</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="screenControl" value="否" required>
+                                <span class="radio-btn"></span>
+                                <span>否</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>其他需求</label>
+                        <textarea name="otherRequirements" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-outside" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>外场转播申请单</h1>
+                <p>节目：<span id="currentProgramNameOutside"></span></p>
+            </div>
+
+            <form id="outsideForm">
+                <div class="form-section">
+                        <div class="section-title">流程安排</div>
+                        <div class="flow-items" id="flowItemsOutside">
+                            <div class="flow-item" data-flow="搭建调试">
+                                <div class="flow-header">
+                                    <span class="flow-name">搭建调试</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('搭建调试')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-搭建调试"></div>
+                            </div>
+                            <div class="flow-item" data-flow="彩排">
+                                <div class="flow-header">
+                                    <span class="flow-name">彩排</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('彩排')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-彩排"></div>
+                            </div>
+                        </div>
+                        <div class="flow-items" id="flowItemsOutside2">
+                            <div class="flow-item" data-flow="zhibo">
+                                <div class="flow-header">
+                                    <span class="flow-name">直播</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('zhibo')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-zhibo"></div>
+                            </div>
+                            <div class="flow-item" data-flow="luzhi">
+                                <div class="flow-header">
+                                    <span class="flow-name">录制</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('luzhi')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-luzhi"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title">设备需求</div>
+                        <div class="form-group">
+                            <label>转播系统 *</label>
+                            <select name="broadcastSystem" required>
+                                <option value="">请选择转播系统</option>
+                                <option value="4K车">4K车</option>
+                                <option value="高清车">高清车</option>
+                                <option value="4K EFP">4K EFP</option>
+                                <option value="高清EFP">高清EFP</option>
+                                <option value="简易EFP">简易EFP</option>
+                            </select>
+                        </div>
+                    <div class="form-group">
+                        <label>摄像机数 *</label>
+                        <div class="number-input">
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, -1)">-</button>
+                            <input type="number" name="cameraCount" value="6" min="0" max="20" required>
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>是否需要摇臂 *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="是" required>
+                                <span class="radio-btn"></span>
+                                <span>是</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="否" required>
+                                <span class="radio-btn"></span>
+                                <span>否</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="section-title">其他需求</div>
+                    <div class="form-group">
+                        <label>其他需求</label>
+                        <textarea name="otherRequirements" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-nanDaTang" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>南大堂申请单</h1>
+                <p>节目：<span id="currentProgramNameNanDaTang"></span></p>
+            </div>
+
+            <form id="nanDaTangForm">
+                <div class="form-section">
+                    <div class="section-title">流程安排</div>
+                    <div class="flow-items" id="flowItemsNanDaTang">
+                        <div class="flow-item" data-flow="装台">
+                            <div class="flow-header">
+                                <span class="flow-name">装台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('装台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-装台"></div>
+                        </div>
+                        <div class="flow-item" data-flow="彩排">
+                            <div class="flow-header">
+                                <span class="flow-name">彩排</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('彩排')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-彩排"></div>
+                        </div>
+                        <div class="flow-item" data-flow="演出">
+                            <div class="flow-header">
+                                <span class="flow-name">演出</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('演出')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-演出"></div>
+                        </div>
+                        <div class="flow-item" data-flow="撤台">
+                            <div class="flow-header">
+                                <span class="flow-name">撤台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('撤台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-撤台"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="section-title">设备需求</div>
+                    <div class="form-group">
+                        <label>其他需求</label>
+                        <textarea name="otherRequirements" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-shift" class="page">
+        <div class="container" style="max-width: 1600px;">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>部门排班</h1>
+                <p id="shiftWeekLabel">排班周</p>
+            </div>
+
+            <div class="task-toolbar">
+                <div class="task-stat">
+                    <div class="task-stat-item">总表只看结果，选择部门后进入本部门排班</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="week-switch-group">
+                        <button type="button" class="week-switch-btn" id="shiftCurrentWeekBtn" onclick="changeShiftWeek('current')">本周排班</button>
+                        <button type="button" class="week-switch-btn" id="shiftNextWeekBtn" onclick="changeShiftWeek('next')">下周排班</button>
+                    </div>
+                    <select id="shiftDepartmentSelect" onchange="changeShiftDepartment(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-width: 180px;"></select>
+                    <button type="button" class="btn btn-primary" id="shiftEditDepartmentBtn" onclick="openShiftDepartmentModal()" style="padding: 8px 20px; font-size: 14px;">📝 开始排班</button>
+                    <button type="button" class="btn btn-primary" onclick="exportShiftBoard()" style="padding: 8px 20px; font-size: 14px;">📊 导出Excel</button>
+                </div>
+            </div>
+
+            <div class="table-container" id="shiftBoardContainer">
+                <p style="text-align: center; color: #999; padding: 40px;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="shiftModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content shift-editor-modal">
+            <div class="modal-header">
+                <h3 id="shiftEditTitle">部门排班</h3>
+                <button type="button" class="btn-close" onclick="closeShiftModal()">×</button>
+            </div>
+
+            <div class="form-section">
+                <div id="shiftDepartmentEditorContainer"></div>
+            </div>
+
+            <div class="btn-container">
+                <button type="button" class="btn btn-secondary" onclick="closeShiftModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveShifts()">💾 保存排班</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cocongg.github.io/app.js"></script>
+    <script>
+// ============================================================
+// edit.js - 编辑模式专属逻辑（从 app.js 抽离）
+// 仅在 edit.html 中加载，index.html 不加载此文件
+// ============================================================
+
+// 覆盖只读模式标志
+isReadOnly = false;
+
+// ========== 密码验证 ==========
+const OPERATION_PASSWORD = '501501';
+
+function verifyPassword(callback) {
+    const pwd = prompt('请输入操作密码：');
+    if (pwd === OPERATION_PASSWORD) {
+        callback();
+    } else if (pwd !== null) {
+        alert('密码错误，操作已拒绝');
+    }
+}
+let otherServiceSelectedDates = [];
+let editingOtherServiceId = null;
+let activeDatePickerContext = 'reserve';
+
+// ========== 参观模式 ==========
+toggleVisitMode = function() {
+    if (isReadOnly) return;
+    const visitMode = document.getElementById('visitMode');
+    const flowSection = document.getElementById('flowSection');
+    const equipmentSection = document.getElementById('equipmentSection');
+    
+    const requiredFields = equipmentSection.querySelectorAll('[required]');
+    
+    if (visitMode.checked) {
+        flowSection.style.display = 'none';
+        equipmentSection.style.display = 'none';
+        requiredFields.forEach(field => {
+            field.removeAttribute('required');
+        });
+    } else {
+        flowSection.style.display = 'block';
+        equipmentSection.style.display = 'block';
+        requiredFields.forEach(field => {
+            field.setAttribute('required', 'required');
+        });
+    }
+};
+
+// ========== 摄像机数量调整 ==========
+adjustCameraCount = function(btn, delta) {
+    if (isReadOnly) return;
+    const input = btn.parentElement.querySelector('input[type="number"]');
+    let value = parseInt(input.value, 10);
+    if (Number.isNaN(value)) value = 6;
+    value = Math.max(0, Math.min(20, value + delta));
+    input.value = value;
+};
+
+// ========== COS 保存 ==========
+saveDataToCOS = async function() {
+    if (isReadOnly) return;
+    const now = new Date();
+    const data = {
+        scheduleData: scheduleData,
+        otherServices: normalizeOtherServiceList(otherServices),
+        backupTime: now.toISOString()
+    };
+
+    try {
+        const cloudStatus = document.getElementById('cloudStatus');
+        if (cloudStatus) {
+            cloudStatus.textContent = '☁️ 同步中...';
+            cloudStatus.className = 'cloud-status syncing';
+        }
+
+        await cos.putObject({
+            Bucket: COS_CONFIG._b1,
+            Region: COS_CONFIG._r1,
+            Key: 'data/latest.json',
+            Body: JSON.stringify(data, null, 2),
+            ContentType: 'application/json; charset=utf-8'
+        });
+
+        const dateStr = now.toISOString().split('T')[0];
+        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '');
+        const historyKey = `data/history/${dateStr}_${timeStr}.json`;
+        await cos.putObject({
+            Bucket: COS_CONFIG._b1,
+            Region: COS_CONFIG._r1,
+            Key: historyKey,
+            Body: JSON.stringify(data, null, 2),
+            ContentType: 'application/json; charset=utf-8'
+        });
+
+        if (cloudStatus) {
+            cloudStatus.textContent = '☁️ 已同步';
+            cloudStatus.className = 'cloud-status success';
+        }
+        return true;
+    } catch (err) {
+        console.log('保存到COS失败:', err);
+        const cloudStatus = document.getElementById('cloudStatus');
+        if (cloudStatus) {
+            cloudStatus.textContent = '⚠️ 同步失败';
+            cloudStatus.className = 'cloud-status error';
+        }
+        return false;
+    }
+};
+
+// ========== 云端备份 ==========
+backupToCloud = function() {
+    if (isReadOnly) return;
+    saveDataToCOS();
+};
+
+// ========== 其他服务 ==========
+addOtherService = function() {
+    if (isReadOnly) return;
+    verifyPassword(() => {
+    editingOtherServiceId = null;
+    document.getElementById('otherServiceForm').reset();
+    document.getElementById('otherServiceModalTitle').textContent = '添加其他服务';
+    document.getElementById('otherServiceSubmitBtn').textContent = '确认添加';
+    document.getElementById('otherServiceEditId').value = '';
+    otherServiceSelectedDates = [new Date().toISOString().split('T')[0]];
+    renderSelectedDates('otherService');
+    document.getElementById('otherServiceModal').style.display = 'flex';
+    });
+};
+
+editOtherService = function(id) {
+    if (isReadOnly) return;
+    verifyPassword(() => {
+    const service = normalizeOtherServiceList(otherServices).find(item => item.id === id);
+    if (!service) return;
+
+    editingOtherServiceId = id;
+    document.getElementById('otherServiceForm').reset();
+    document.getElementById('otherServiceModalTitle').textContent = '编辑其他服务';
+    document.getElementById('otherServiceSubmitBtn').textContent = '保存修改';
+    document.getElementById('otherServiceEditId').value = id;
+    document.querySelector('#otherServiceForm input[name="programName"]').value = service.programName || '';
+    document.querySelector('#otherServiceForm input[name="applicant"]').value = service.applicant || '';
+    document.querySelector('#otherServiceForm textarea[name="serviceDetails"]').value = service.serviceDetails || '';
+    otherServiceSelectedDates = [...getOtherServiceDates(service)];
+    renderSelectedDates('otherService');
+    document.getElementById('otherServiceModal').style.display = 'flex';
+    });
+};
+
+closeOtherServiceModal = function() {
+    if (isReadOnly) return;
+    editingOtherServiceId = null;
+    otherServiceSelectedDates = [];
+    document.getElementById('otherServiceEditId').value = '';
+    document.getElementById('otherServiceModal').style.display = 'none';
+};
+
+deleteOtherService = function(id) {
+    if (isReadOnly) return;
+    verifyPassword(() => {
+    if (confirm('确定要删除这条其他服务吗？')) {
+        otherServices = otherServices.filter(s => s.id !== id);
+        renderTaskSheet();
+        saveDataToCOS();
+    }
+    });
+};
+
+// ========== 生成每周任务单PDF ==========
+generateCurrentWeeklyTaskSheet = function() {
+    generateWeeklyTaskSheet('current');
+};
+
+generateWeeklyTaskSheet = function(weekType = 'next') {
+    if (isReadOnly) return;
+    if (typeof html2canvas === 'undefined') {
+        alert('图片生成库加载失败，请刷新页面重试');
+        return;
+    }
+    if (typeof window.jspdf === 'undefined') {
+        alert('PDF生成库加载失败，请刷新页面重试');
+        return;
+    }
+
+    const flowNameMap = {
+        'zhibo': '直播',
+        'luzhi': '录制',
+        '搭建调试': '搭建调试',
+        '彩排': '彩排',
+        '装台': '装台',
+        '场地': '场地',
+        '装调灯': '装调灯',
+        '不带机彩排': '不带机彩排',
+        '带机彩排': '带机彩排'
+    };
+
+    const weekStart = weekType === 'current' ? getCurrentWeekMondayString() : getNextWeekMondayString();
+    const weekDates = getWeekDatesByStart(weekStart);
+    const weekLabel = weekType === 'current' ? '本周任务单' : '下周任务单';
+    const weekDateSet = new Set(weekDates);
+
+    const dateGroups = {};
+    weekDates.forEach(date => {
+        dateGroups[date] = [];
+    });
+
+    const filledRecords = scheduleData.filter(item => {
+        return item.status === 'filled' && weekDateSet.has(item.date);
+    });
+
+    filledRecords.forEach(item => {
+        if (dateGroups[item.date]) {
+            dateGroups[item.date].push(item);
+        }
+    });
+
+    expandOtherServices(otherServices).forEach(service => {
+        if (dateGroups[service.date]) {
+            dateGroups[service.date].push(service);
+        }
+    });
+
+    const allColumns = ['800演播室', '1800演播室', '南大堂', '4K车', '高清车', '4K EFP', '高清EFP', '简易EFP', '其他服务'];
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+    const usedColumns = allColumns.filter(col => {
+        return Object.values(dateGroups).some(items => items.some(item => {
+            if (item.type === 'otherService' && col === '其他服务') return true;
+            if (item.type === 'studio' || item.type === 'nanDaTang') {
+                if (item.studio === '800' && col === '800演播室') return true;
+                if (item.studio === '1800' && col === '1800演播室') return true;
+                if (item.studio === '南大堂' && col === '南大堂') return true;
+            }
+            if (item.type === 'outside') {
+                const equipSystem = (item.equipment && item.equipment.broadcastSystem) || '';
+                if (equipSystem === col) return true;
+            }
+            return false;
+        }));
+    });
+
+    const columns = usedColumns.length > 0 ? usedColumns : allColumns;
+
+    let html = '<table style="border-collapse: collapse; font-size: 11px; table-layout: auto;">';
+    html += '<thead><tr>';
+    html += '<th style="border: 1px solid #333; padding: 6px 10px; text-align: center; background: #667eea; color: white; white-space: nowrap;">日期</th>';
+    columns.forEach(col => {
+        html += `<th style="border: 1px solid #333; padding: 6px 10px; text-align: center; background: #667eea; color: white; white-space: nowrap;">${col}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    weekDates.forEach(date => {
+        html += '<tr>';
+        
+        const dateObj = new Date(date);
+        const dateStr = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+        const weekdayStr = weekdays[dateObj.getDay()];
+        
+        html += `<td style="border: 1px solid #333; padding: 6px 10px; background: #f5f7ff; text-align: center; font-weight: 600; white-space: nowrap;">${dateStr}<br><span style="font-size: 10px; color: #666; font-weight: normal;">${weekdayStr}</span></td>`;
+        
+        columns.forEach(col => {
+            const colItems = dateGroups[date].filter(item => {
+                if (item.type === 'otherService' && col === '其他服务') return true;
+                if (item.type === 'studio' || item.type === 'nanDaTang') {
+                    if (item.studio === '800' && col === '800演播室') return true;
+                    if (item.studio === '1800' && col === '1800演播室') return true;
+                    if (item.studio === '南大堂' && col === '南大堂') return true;
+                }
+                if (item.type === 'outside') {
+                    const equipSystem = (item.equipment && item.equipment.broadcastSystem) || '';
+                    if (equipSystem === col) return true;
+                }
+                return false;
+            });
+            
+            if (colItems.length > 0) {
+                let cellContent = '';
+                colItems.forEach((item, idx) => {
+                    const equipment = item.equipment || {};
+                    const flowTimes = item.flowTimes || {};
+                    const cameraCount = equipment.cameraCount !== undefined && equipment.cameraCount !== '' ? equipment.cameraCount : '-';
+                    const hasJib = equipment.jib === '是';
+                    const applicant = item.applicant || '-';
+                    const otherReq = equipment.otherRequirements || '';
+                    
+                    const flowList = [];
+                    Object.keys(flowTimes).forEach(flowName => {
+                        flowTimes[flowName].forEach(ft => {
+                            flowList.push({ name: flowName, ...ft });
+                        });
+                    });
+                    
+                    const filteredFlowList = flowList.filter(ft => ft.startDate === date);
+                    filteredFlowList.sort((a, b) => a.startTime.localeCompare(b.startTime));
+                    
+                    if (item.type === 'otherService') {
+                        cellContent += `<div style="font-weight: 600; font-size: 13px;">${item.programName}</div>`;
+                        cellContent += `<div style="color: #555; font-size: 9px; margin: 1px 0;">👤 ${item.applicant}</div>`;
+                        if (item.serviceDetails) {
+                            cellContent += `<div style="color: #666; font-size: 10px; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 3px; line-height: 1.4;">📝 ${item.serviceDetails}</div>`;
+                        }
+                    } else if (item.type === 'studio' || item.type === 'nanDaTang') {
+                        cellContent += `<div style="font-weight: 600; font-size: 13px;">${item.programName}${item.visitMode ? ' <span style="font-size: 10px; background: #e0f2fe; color: #0284c7; padding: 1px 4px; border-radius: 3px; margin-left: 4px;">参观</span>' : ''}</div>`;
+                        cellContent += `<div style="color: #555; font-size: 9px; margin: 1px 0;">🏢 ${item.department} 👤 ${applicant}</div>`;
+                        
+                        if (!item.visitMode && item.type === 'studio') {
+                            cellContent += `<div style="color: #555; font-size: 9px; margin: 1px 0;">📹 <span style="font-size: 13px; font-weight: 600; color: #e65100;">${cameraCount}</span>机位${hasJib ? ' <span style="background: #fff3e0; color: #e65100; padding: 1px 3px; border-radius: 2px; font-size: 8px; font-weight: 600;">摇臂</span>' : ''}</div>`;
+                        }
+                        
+                        if (!item.visitMode && filteredFlowList.length > 0) {
+                            cellContent += '<div style="margin-top: 3px;">';
+                            filteredFlowList.forEach(flow => {
+                                const displayName = flowNameMap[flow.name] || flow.name;
+                                cellContent += `<div style="margin-bottom: 2px; display: flex; align-items: center; gap: 6px;"><span style="background: #eef2ff; color: #4338ca; padding: 1px 4px; border-radius: 2px; font-size: 10px;">${displayName}</span><span style="font-size: 10px; font-weight: 500;">${flow.startTime}-${flow.endTime}</span></div>`;
+                            });
+                            
+                            if (equipment.screenControl === '是') {
+                                cellContent += `<div style="margin-top: 3px;"><span style="background: #dcfce7; color: #166534; padding: 1px 4px; border-radius: 3px; font-size: 9px; font-weight: 500;">屏控</span></div>`;
+                            }
+                            
+                            cellContent += '</div>';
+                        }
+                        
+                        if (item.visitMode) {
+                            if (item.other) {
+                                cellContent += `<div style="color: #666; font-size: 10px; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 3px; line-height: 1.4;">📝 ${item.other}</div>`;
+                            }
+                        } else {
+                            if (otherReq) {
+                                cellContent += `<div style="color: #666; font-size: 10px; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 3px; line-height: 1.4;">📝 ${otherReq}</div>`;
+                            }
+                        }
+                    } else {
+                        cellContent += `<div style="font-weight: 600; font-size: 13px;">${item.programName}</div>`;
+                        if (item.projectLocation) {
+                            cellContent += `<div style="color: #555; font-size: 9px; margin: 1px 0;">📍 ${item.projectLocation}</div>`;
+                        }
+                        if (item.type !== 'nanDaTang') {
+                            cellContent += `<div style="color: #555; font-size: 9px; margin: 1px 0;">📹 <span style="font-size: 13px; font-weight: 600; color: #e65100;">${cameraCount}</span>机位${hasJib ? ' <span style="background: #fff3e0; color: #e65100; padding: 1px 3px; border-radius: 2px; font-size: 8px; font-weight: 600;">摇臂</span>' : ''}</div>`;
+                        }
+                        cellContent += `<div style="color: #555; font-size: 9px; margin: 1px 0;">🏢 ${item.department || '-'} 👤 ${applicant}</div>`;
+                        
+                        if (filteredFlowList.length > 0) {
+                            cellContent += '<div style="margin-top: 3px;">';
+                            filteredFlowList.forEach(flow => {
+                                const displayName = flowNameMap[flow.name] || flow.name;
+                                cellContent += `<div style="margin-bottom: 2px; display: flex; align-items: center; gap: 6px;"><span style="background: #eef2ff; color: #4338ca; padding: 1px 4px; border-radius: 2px; font-size: 10px;">${displayName}</span><span style="font-size: 10px; font-weight: 500;">${flow.startTime}-${flow.endTime}</span></div>`;
+                            });
+                            cellContent += '</div>';
+                        }
+                        
+                        if (otherReq) {
+                            cellContent += `<div style="color: #666; font-size: 10px; margin-top: 3px; border-top: 1px dashed #ccc; padding-top: 3px; line-height: 1.4;">📝 ${otherReq}</div>`;
+                        }
+                    }
+                    
+                    if (idx < colItems.length - 1) {
+                        cellContent += '<div style="border-top: 1px solid #ddd; margin: 4px 0;"></div>';
+                    }
+                });
+                html += `<td style="border: 1px solid #333; padding: 4px 6px; vertical-align: top; min-width: 100px;">${cellContent}</td>`;
+            } else {
+                html += '<td style="border: 1px solid #333; padding: 4px 6px; vertical-align: top; color: #ccc; text-align: center; min-width: 100px;">-</td>';
+            }
+        });
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+
+    const container = document.createElement('div');
+    const innerDiv = document.createElement('div');
+    innerDiv.style.cssText = 'padding: 20px; background: white; display: inline-block; width: fit-content;';
+    innerDiv.innerHTML = `
+        <h2 style="text-align: center; margin-bottom: 20px; font-size: 18px;">${weekLabel}</h2>
+        <p style="text-align: center; margin-bottom: 10px; color: #666; font-size: 12px;">${formatDateShort(weekDates[0])} ~ ${formatDateShort(weekDates[6])}</p>
+        ${html}
+    `;
+    container.style.cssText = 'position: fixed; top: -9999px; left: -9999px;';
+    container.appendChild(innerDiv);
+    document.body.appendChild(container);
+
+    html2canvas(innerDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true
+    }).then(canvas => {
+        document.body.removeChild(container);
+
+        const { jsPDF } = window.jspdf;
+        // A4横版尺寸 (mm)
+        const pageWidth = 420;
+        const pageHeight = 297;
+
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a3'
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+
+        // 按比例缩放图片填满页面，留小边距
+        const margin = 10;
+        const contentWidth = pageWidth - margin * 2;
+        const contentHeight = pageHeight - margin * 2;
+        const ratio = Math.min(contentWidth / imgWidth, contentHeight / imgHeight);
+        const scaledWidth = imgWidth * ratio;
+        const scaledHeight = imgHeight * ratio;
+        const offsetX = margin + (contentWidth - scaledWidth) / 2;
+        const offsetY = margin + (contentHeight - scaledHeight) / 2;
+
+        pdf.addImage(imgData, 'PNG', offsetX, offsetY, scaledWidth, scaledHeight);
+
+        const fileName = `${weekLabel}_${formatDateShort(weekDates[0])}-${formatDateShort(weekDates[6])}.pdf`;
+        pdf.save(fileName);
+    }).catch(err => {
+        if (container.parentNode) document.body.removeChild(container);
+        alert('生成PDF失败，请重试');
+    });
+};
+
+// ========== 流程时间 ==========
+addFlowTime = function(flowName) {
+    if (isReadOnly) return;
+    const container = document.getElementById('flow-times-' + flowName);
+    const timeId = Date.now().toString();
+    
+    const timeRow = document.createElement('div');
+    timeRow.className = 'flow-time-row';
+    timeRow.innerHTML = `
+        <div class="flow-time-group flow-time-start">
+            <label>开始</label>
+            <input type="date" name="flow_${flowName}_start_date_${timeId}" class="flow-date-input" onchange="calculateDuration('${timeId}')">
+            <select name="flow_${flowName}_start_time_${timeId}" class="time-select" onchange="calculateDuration('${timeId}')">
+                ${generateTimeOptions()}
+            </select>
+        </div>
+        <div class="flow-time-group flow-time-end">
+            <label>结束</label>
+            <select name="flow_${flowName}_end_time_${timeId}" class="time-select" onchange="calculateDuration('${timeId}')">
+                ${generateTimeOptions()}
+            </select>
+        </div>
+        <div class="flow-duration" id="duration_${timeId}">
+            <span class="duration-label">时长</span>
+            <span class="duration-value">0小时</span>
+        </div>
+        <button type="button" class="flow-remove-btn" onclick="removeFlowTime(this)">×</button>
+    `;
+    
+    container.appendChild(timeRow);
+};
+
+addFlowTimeNanDaTang = function(flowName) {
+    if (isReadOnly) return;
+    const container = document.getElementById('flow-times-ndt-' + flowName);
+    const timeId = Date.now().toString();
+    
+    const timeRow = document.createElement('div');
+    timeRow.className = 'flow-time-row';
+    timeRow.innerHTML = `
+        <div class="flow-time-group flow-time-start">
+            <label>开始</label>
+            <input type="date" name="flow_${flowName}_start_date_${timeId}" class="flow-date-input" onchange="calculateDuration('${timeId}')">
+            <select name="flow_${flowName}_start_time_${timeId}" class="time-select" onchange="calculateDuration('${timeId}')">
+                ${generateTimeOptions()}
+            </select>
+        </div>
+        <div class="flow-time-group flow-time-end">
+            <label>结束</label>
+            <select name="flow_${flowName}_end_time_${timeId}" class="time-select" onchange="calculateDuration('${timeId}')">
+                ${generateTimeOptions()}
+            </select>
+        </div>
+        <div class="flow-duration" id="duration_${timeId}">
+            <span class="duration-label">时长</span>
+            <span class="duration-value">0小时</span>
+        </div>
+        <button type="button" class="flow-remove-btn" onclick="removeFlowTime(this)">×</button>
+    `;
+    
+    container.appendChild(timeRow);
+};
+
+loadFlowTimes = function(record) {
+    if (!record || !record.flowTimes) return;
+    
+    const flowContainers = document.querySelectorAll('.flow-times');
+    flowContainers.forEach(container => {
+        container.innerHTML = '';
+    });
+    
+    const isNanDaTang = record.type === 'nanDaTang';
+    const prefix = isNanDaTang ? 'flow-times-ndt-' : 'flow-times-';
+    const addFunc = isNanDaTang ? addFlowTimeNanDaTang : addFlowTime;
+    
+    const flowTimes = record.flowTimes;
+    Object.keys(flowTimes).forEach(flowName => {
+        const times = flowTimes[flowName];
+        times.forEach(timeData => {
+            addFunc(flowName);
+            
+            const container = document.getElementById(prefix + flowName);
+            const lastRow = container.lastElementChild;
+            
+            const dateInput = lastRow.querySelector('input[type="date"]');
+            const startTimeSelect = lastRow.querySelector('select[name*="start_time"]');
+            const endTimeSelect = lastRow.querySelector('select[name*="end_time"]');
+            
+            if (dateInput) dateInput.value = timeData.startDate;
+            if (startTimeSelect) startTimeSelect.value = timeData.startTime;
+            if (endTimeSelect) endTimeSelect.value = timeData.endTime;
+            
+            const timeId = lastRow.querySelector('.flow-duration').id.replace('duration_', '');
+            calculateDuration(timeId);
+        });
+    });
+    
+    if (record.equipment) {
+        let form;
+        if (record.type === 'studio') {
+            form = document.getElementById('studioForm');
+        } else if (record.type === 'nanDaTang') {
+            form = document.getElementById('nanDaTangForm');
+        } else {
+            form = document.getElementById('outsideForm');
+        }
+        const formData = form.elements;
+        
+        Object.keys(record.equipment).forEach(key => {
+            const el = formData[key];
+            if (el) {
+                if (el.type === 'checkbox' || el.type === 'radio') {
+                    el.checked = record.equipment[key] === '是' || record.equipment[key] === el.value;
+                } else {
+                    el.value = record.equipment[key];
+                }
+            }
+        });
+    }
+    
+    if (record.type === 'studio' && record.visitMode) {
+        const visitModeCheckbox = document.getElementById('visitMode');
+        if (visitModeCheckbox) {
+            visitModeCheckbox.checked = record.visitMode;
+            toggleVisitMode();
+        }
+    }
+};
+
+calculateDuration = function(timeId) {
+    const startDateInput = document.querySelector(`input[name*="_start_date_${timeId}"]`);
+    const startTimeSelect = document.querySelector(`select[name*="_start_time_${timeId}"]`);
+    const endTimeSelect = document.querySelector(`select[name*="_end_time_${timeId}"]`);
+    const durationDisplay = document.getElementById(`duration_${timeId}`);
+    
+    if (!startDateInput || !startTimeSelect || !endTimeSelect || !durationDisplay) return;
+    
+    const startDate = startDateInput.value;
+    const startTime = startTimeSelect.value;
+    const endTime = endTimeSelect.value;
+    
+    if (!startDate || !startTime || !endTime) {
+        durationDisplay.querySelector('.duration-value').textContent = '0小时';
+        return;
+    }
+    
+    const startHour = parseInt(startTime.split(':')[0]);
+    const startMinute = parseInt(startTime.split(':')[1]);
+    const endHour = parseInt(endTime.split(':')[0]);
+    const endMinute = parseInt(endTime.split(':')[1]);
+    
+    let durationHours = endHour - startHour;
+    let durationMinutes = endMinute - startMinute;
+    
+    if (durationHours < 0 || (durationHours === 0 && durationMinutes < 0)) {
+        durationHours += 24;
+    }
+    
+    const totalHours = durationHours + durationMinutes / 60;
+    const displayHours = totalHours % 1 === 0 ? totalHours : totalHours.toFixed(1);
+    
+    durationDisplay.querySelector('.duration-value').textContent = `${displayHours}小时`;
+};
+
+generateTimeOptions = function() {
+    let options = '';
+    for (let hour = 0; hour < 24; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+            const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            options += `<option value="${timeStr}">${timeStr}</option>`;
+        }
+    }
+    return options;
+};
+
+removeFlowTime = function(btn) {
+    if (isReadOnly) return;
+    btn.parentElement.remove();
+};
+
+// ========== 预约/编辑 ==========
+selectOption = function(type) {
+    if (isReadOnly) return;
+    verifyPassword(() => {
+    selectedOption = type;
+    isEditMode = false;
+    
+    if (type === 'studio') {
+        document.getElementById('reserveTitle').textContent = '综艺演播室预约';
+    } else if (type === 'nanDaTang') {
+        document.getElementById('reserveTitle').textContent = '南大堂预约';
+    } else {
+        document.getElementById('reserveTitle').textContent = '外场转播预约';
+    }
+    document.getElementById('reserveSubtitle').textContent = '请填写预约信息，可选择多个日期';
+    document.getElementById('reserveSubmitBtn').textContent = '确认预约';
+    
+    const studioSelectSection = document.getElementById('studioSelectSection');
+    const broadcastSystemGroup = document.getElementById('broadcastSystemGroup');
+    const projectLocationGroup = document.getElementById('projectLocationGroup');
+    
+    if (type === 'studio') {
+        studioSelectSection.style.display = 'block';
+        broadcastSystemGroup.style.display = 'none';
+        projectLocationGroup.style.display = 'none';
+        
+        const studio800Checkbox = document.querySelector('input[name="studio"][value="800"]');
+        const studio1800Checkbox = document.querySelector('input[name="studio"][value="1800"]');
+        if (studio800Checkbox) studio800Checkbox.parentElement.style.display = 'block';
+        if (studio1800Checkbox) studio1800Checkbox.parentElement.style.display = 'block';
+    } else if (type === 'nanDaTang') {
+        studioSelectSection.style.display = 'none';
+        broadcastSystemGroup.style.display = 'none';
+        projectLocationGroup.style.display = 'none';
+    } else {
+        studioSelectSection.style.display = 'none';
+        broadcastSystemGroup.style.display = 'block';
+        projectLocationGroup.style.display = 'block';
+    }
+    
+    document.getElementById('reserveForm').reset();
+    document.querySelector('input[name="editId"]').value = '';
+    selectedDates = [];
+    document.getElementById('selectedDates').innerHTML = '';
+    
+    document.getElementById('reserveSubmitBtn').disabled = true;
+    showPage('page-reserve');
+    });
+};
+
+editEvent = function(id) {
+    if (isReadOnly) return;
+    const record = scheduleData.find(r => r.id === id);
+    if (!record) return;
+    
+    isEditMode = true;
+    selectedOption = record.type;
+    currentProgramId = id;
+    
+    if (record.type === 'studio') {
+        document.getElementById('reserveTitle').textContent = '编辑综艺演播室预约';
+    } else if (record.type === 'nanDaTang') {
+        document.getElementById('reserveTitle').textContent = '编辑南大堂预约';
+    } else {
+        document.getElementById('reserveTitle').textContent = '编辑外场转播预约';
+    }
+    document.getElementById('reserveSubtitle').textContent = '修改预约信息';
+    document.getElementById('reserveSubmitBtn').textContent = '保存修改';
+    
+    const studioSelectSection = document.getElementById('studioSelectSection');
+    const broadcastSystemGroup = document.getElementById('broadcastSystemGroup');
+    const projectLocationGroup = document.getElementById('projectLocationGroup');
+    
+    if (record.type === 'studio') {
+        studioSelectSection.style.display = 'block';
+        broadcastSystemGroup.style.display = 'none';
+        projectLocationGroup.style.display = 'none';
+        
+        const studio800Checkbox = document.querySelector('input[name="studio"][value="800"]');
+        const studio1800Checkbox = document.querySelector('input[name="studio"][value="1800"]');
+        if (studio800Checkbox) studio800Checkbox.parentElement.style.display = 'block';
+        if (studio1800Checkbox) studio1800Checkbox.parentElement.style.display = 'block';
+    } else if (record.type === 'nanDaTang') {
+        studioSelectSection.style.display = 'none';
+        broadcastSystemGroup.style.display = 'none';
+        projectLocationGroup.style.display = 'none';
+    } else {
+        studioSelectSection.style.display = 'none';
+        broadcastSystemGroup.style.display = 'block';
+        projectLocationGroup.style.display = 'block';
+    }
+    
+    document.getElementById('reserveForm').reset();
+    document.querySelector('input[name="editId"]').value = record.id;
+    document.querySelector('input[name="programName"]').value = record.programName;
+    document.querySelector('input[name="department"]').value = record.department;
+    document.querySelector('input[name="applicant"]').value = record.applicant;
+    if (record.type === 'outside') {
+        document.querySelector('input[name="broadcastSystem"]').value = record.broadcastSystem || '';
+        document.querySelector('input[name="projectLocation"]').value = record.projectLocation || '';
+    }
+    document.querySelector('textarea[name="other"]').value = record.other || '';
+    
+    const batchGroupId = record.groupId;
+    const sameProgramRecords = batchGroupId
+        ? scheduleData.filter(r => r.groupId === batchGroupId)
+        : scheduleData.filter(r => r.programName === record.programName);
+    if (record.type === 'studio') {
+        const selectedStudios = [...new Set(sameProgramRecords.map(r => r.studio).filter(Boolean))];
+        const studioCheckboxes = document.querySelectorAll('input[name="studio"]');
+        studioCheckboxes.forEach(cb => {
+            cb.checked = selectedStudios.includes(cb.value);
+        });
+    }
+    selectedDates = [...new Set(sameProgramRecords.map(r => r.date))];
+    renderSelectedDates();
+    checkReserveSubmit();
+    
+    showPage('page-reserve');
+};
+
+// ========== 日期选择 ==========
+function getDateSelectionState(context) {
+    const isOtherService = context === 'otherService';
+    return {
+        dates: isOtherService ? otherServiceSelectedDates : selectedDates,
+        setDates(newDates) {
+            if (isOtherService) {
+                otherServiceSelectedDates = newDates;
+            } else {
+                selectedDates = newDates;
+            }
+        },
+        inputId: isOtherService ? 'otherServiceDateInput' : 'dateInput',
+        containerId: isOtherService ? 'otherServiceSelectedDates' : 'selectedDates',
+        hiddenId: isOtherService ? 'otherServiceDatesHidden' : 'datesHidden'
+    };
+}
+
+addDate = function(context = 'reserve') {
+    if (isReadOnly) return;
+    activeDatePickerContext = context;
+    const { inputId } = getDateSelectionState(context);
+    const dateInput = document.getElementById(inputId);
+    dateInput.style.display = 'block';
+    dateInput.focus();
+};
+
+showDateRangeModal = function(context = 'reserve') {
+    if (isReadOnly) return;
+    activeDatePickerContext = context;
+    document.getElementById('rangeStart').value = '';
+    document.getElementById('rangeEnd').value = '';
+    document.getElementById('rangePreview').textContent = '';
+    document.getElementById('dateRangeModal').style.display = 'flex';
+    setTimeout(() => {
+        const rangeStart = document.getElementById('rangeStart');
+        if (rangeStart) rangeStart.focus();
+    }, 0);
+};
+
+closeDateRangeModal = function() {
+    if (isReadOnly) return;
+    document.getElementById('dateRangeModal').style.display = 'none';
+};
+
+updateRangePreview = function() {
+    if (isReadOnly) return;
+    const start = document.getElementById('rangeStart').value;
+    const end = document.getElementById('rangeEnd').value;
+    const preview = document.getElementById('rangePreview');
+    if (!start || !end) {
+        preview.textContent = '';
+        return;
+    }
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (startDate > endDate) {
+        preview.textContent = '⚠️ 开始日期不能晚于结束日期';
+        preview.style.color = '#ef4444';
+        return;
+    }
+    const days = Math.floor((endDate - startDate) / 86400000) + 1;
+    preview.textContent = `将添加 ${days} 天（含已选日期会自动去重）`;
+    preview.style.color = '#666';
+};
+
+confirmDateRange = function() {
+    if (isReadOnly) return;
+    const start = document.getElementById('rangeStart').value;
+    const end = document.getElementById('rangeEnd').value;
+    const state = getDateSelectionState(activeDatePickerContext);
+
+    if (!start || !end) {
+        alert('请选择开始日期和结束日期');
+        return;
+    }
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    if (startDate > endDate) {
+        alert('开始日期不能晚于结束日期');
+        return;
+    }
+
+    let current = new Date(startDate);
+    const newDates = [...state.dates];
+    while (current <= endDate) {
+        const dateStr = current.toISOString().split('T')[0];
+        if (!newDates.includes(dateStr)) {
+            newDates.push(dateStr);
+        }
+        current.setDate(current.getDate() + 1);
+    }
+
+    state.setDates(newDates.sort());
+    renderSelectedDates(activeDatePickerContext);
+    if (activeDatePickerContext === 'reserve') {
+        checkReserveSubmit();
+    }
+    closeDateRangeModal();
+};
+
+removeDate = function(date, context = 'reserve') {
+    if (isReadOnly) return;
+    const state = getDateSelectionState(context);
+    state.setDates(state.dates.filter(d => d !== date));
+    renderSelectedDates(context);
+    if (context === 'reserve') {
+        checkReserveSubmit();
+    }
+};
+
+renderSelectedDates = function(context = 'reserve') {
+    const state = getDateSelectionState(context);
+    const container = document.getElementById(state.containerId);
+    container.innerHTML = '';
+    
+    state.dates.forEach(date => {
+        const dateObj = new Date(date);
+        const dateStr = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+        const tag = document.createElement('div');
+        tag.className = 'date-tag';
+        tag.innerHTML = `${dateStr} <span class="remove-btn" onclick="removeDate('${date}', '${context}')">×</span>`;
+        container.appendChild(tag);
+    });
+    
+    document.getElementById(state.hiddenId).value = state.dates.join(',');
+};
+
+checkReserveSubmit = function() {
+    if (isReadOnly) return;
+    const btn = document.getElementById('reserveSubmitBtn');
+    const programName = document.querySelector('input[name="programName"]').value;
+    const department = document.querySelector('input[name="department"]').value;
+    const applicant = document.querySelector('input[name="applicant"]').value;
+    
+    let studioValid = true;
+    if (selectedOption === 'studio' || selectedOption === 'nanDaTang') {
+        if (selectedOption === 'studio') {
+            const checkedStudios = document.querySelectorAll('input[name="studio"]:checked');
+            studioValid = checkedStudios.length > 0;
+        }
+    }
+    
+    if (selectedDates.length > 0 && programName && department && applicant && studioValid) {
+        btn.disabled = false;
+    } else {
+        btn.disabled = true;
+    }
+};
+
+// ========== 事件操作 ==========
+handleEventAction = function(id, action) {
+    if (isReadOnly) return;
+    verifyPassword(() => {
+    const record = scheduleData.find(r => r.id === id);
+    if (!record) return;
+
+    if (action === 'cancel') {
+        const batchGroupId = record.groupId;
+        const sameNameRecords = batchGroupId
+            ? scheduleData.filter(r => r.groupId === batchGroupId)
+            : scheduleData.filter(r => r.programName === record.programName);
+        sameNameRecords.forEach(r => {
+            if (r.status === 'filled') {
+                r.status = 'filled_cancelled';
+            } else if (r.status === 'filled_cancelled') {
+                r.status = 'filled';
+            } else {
+                r.status = r.status === 'cancelled' ? 'pending' : 'cancelled';
+            }
+        });
+        renderSchedule();
+        saveDataToCOS();
+    } else if (action === 'edit') {
+        if (record.status === 'filled' || record.status === 'filled_cancelled') {
+            currentProgramId = id;
+            document.getElementById('currentProgramName').textContent = record.programName;
+            document.getElementById('currentProgramNameOutside').textContent = record.programName;
+            document.getElementById('currentProgramNameNanDaTang').textContent = record.programName;
+            
+            if (record.type === 'studio') {
+                showPage('page-studio');
+                loadFlowTimes(record);
+            } else if (record.type === 'nanDaTang') {
+                showPage('page-nanDaTang');
+                loadFlowTimes(record);
+            } else {
+                showPage('page-outside');
+                loadFlowTimes(record);
+            }
+        } else {
+            editEvent(id);
+        }
+    } else if (action === 'delete') {
+        if (confirm('确定要删除这个节目吗？')) {
+            scheduleData = scheduleData.filter(r => r.id !== id);
+            renderSchedule();
+            saveDataToCOS();
+        }
+    } else if (action === 'fill') {
+        currentProgramId = id;
+        document.getElementById('currentProgramName').textContent = record.programName;
+        document.getElementById('currentProgramNameOutside').textContent = record.programName;
+        document.getElementById('currentProgramNameNanDaTang').textContent = record.programName;
+        
+        if (record.type === 'studio') {
+            showPage('page-studio');
+        } else if (record.type === 'nanDaTang') {
+            showPage('page-nanDaTang');
+        } else {
+            showPage('page-outside');
+        }
+    } else if (action === 'back') {
+        if (confirm('确定要返回预约模式吗？填单信息将被清除，但预约信息保留。')) {
+            const batchGroupId = record.groupId;
+            const sameNameRecords = batchGroupId
+                ? scheduleData.filter(r => r.groupId === batchGroupId)
+                : scheduleData.filter(r => r.programName === record.programName);
+            sameNameRecords.forEach(r => {
+                r.status = 'pending';
+                delete r.equipment;
+                delete r.flowTimes;
+            });
+            renderSchedule();
+            saveDataToCOS();
+        }
+    }
+    });
+};
+
+// 预约表单提交
+document.getElementById('reserveForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (isReadOnly) return;
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData.entries());
+    
+    const selectedStudios = [];
+    const studioCheckboxes = this.querySelectorAll('input[name="studio"]:checked');
+    studioCheckboxes.forEach(cb => selectedStudios.push(cb.value));
+
+    if (isEditMode && data.editId) {
+        const record = scheduleData.find(r => r.id === data.editId);
+        if (record) {
+            const batchGroupId = record.groupId;
+            const existingRecords = batchGroupId
+                ? scheduleData.filter(r => r.groupId === batchGroupId)
+                : scheduleData.filter(r => r.programName === record.programName && r.type === record.type);
+            existingRecords.forEach((r, idx) => {
+                r.programName = data.programName;
+                r.department = data.department;
+                r.applicant = data.applicant;
+                r.broadcastSystem = data.broadcastSystem || '';
+                r.projectLocation = data.projectLocation || '';
+                r.other = data.other || '';
+                
+                if (record.type === 'studio' && idx < selectedStudios.length) {
+                    r.studio = selectedStudios[idx % selectedStudios.length];
+                } else if (record.type === 'nanDaTang') {
+                    r.studio = '南大堂';
+                }
+                if (idx < selectedDates.length) {
+                    r.date = selectedDates[idx];
+                }
+            });
+            
+            let totalNeeded;
+            if (record.type === 'studio') {
+                totalNeeded = selectedDates.length * selectedStudios.length;
+            } else if (record.type === 'nanDaTang') {
+                totalNeeded = selectedDates.length;
+            } else {
+                totalNeeded = selectedDates.length;
+            }
+            
+            if (existingRecords.length > totalNeeded) {
+                for (let i = existingRecords.length - 1; i >= totalNeeded; i--) {
+                    const idx = scheduleData.findIndex(r => r.id === existingRecords[i].id);
+                    if (idx !== -1) {
+                        scheduleData.splice(idx, 1);
+                    }
+                }
+            }
+            
+            if (existingRecords.length < totalNeeded) {
+                for (let i = existingRecords.length; i < totalNeeded; i++) {
+                    let newRecord;
+                    if (record.type === 'studio') {
+                        const dateIdx = Math.floor(i / selectedStudios.length);
+                        const studioIdx = i % selectedStudios.length;
+                        newRecord = {
+                            id: Date.now().toString() + '-' + selectedDates[dateIdx] + '-' + selectedStudios[studioIdx],
+                            groupId: batchGroupId || (Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6)),
+                            date: selectedDates[dateIdx],
+                            studio: selectedStudios[studioIdx],
+                            programName: data.programName,
+                            department: data.department,
+                            applicant: data.applicant,
+                            broadcastSystem: data.broadcastSystem || '',
+                            projectLocation: data.projectLocation || '',
+                            other: data.other || '',
+                            status: 'pending',
+                            type: record.type
+                        };
+                    } else if (record.type === 'nanDaTang') {
+                        newRecord = {
+                            id: Date.now().toString() + '-' + selectedDates[i] + '-ndt',
+                            groupId: batchGroupId || (Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6)),
+                            date: selectedDates[i],
+                            studio: '南大堂',
+                            programName: data.programName,
+                            department: data.department,
+                            applicant: data.applicant,
+                            broadcastSystem: '',
+                            projectLocation: '',
+                            other: data.other || '',
+                            status: 'pending',
+                            type: 'nanDaTang'
+                        };
+                    } else {
+                        newRecord = {
+                            id: Date.now().toString() + '-' + selectedDates[i] + '-outside',
+                            groupId: batchGroupId || (Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6)),
+                            date: selectedDates[i],
+                            studio: '外场转播',
+                            programName: data.programName,
+                            department: data.department,
+                            applicant: data.applicant,
+                            broadcastSystem: data.broadcastSystem || '',
+                            projectLocation: data.projectLocation || '',
+                            other: data.other || '',
+                            status: 'pending',
+                            type: 'outside'
+                        };
+                    }
+                    scheduleData.push(newRecord);
+                }
+            }
+        }
+    } else {
+        const groupId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6);
+        selectedDates.forEach(date => {
+            if (selectedOption === 'studio' && selectedStudios.length > 0) {
+                selectedStudios.forEach(studio => {
+                    const record = {
+                        id: Date.now().toString() + '-' + date + '-' + studio,
+                        groupId: groupId,
+                        date: date,
+                        studio: studio,
+                        programName: data.programName,
+                        department: data.department,
+                        applicant: data.applicant,
+                        broadcastSystem: data.broadcastSystem || '',
+                        projectLocation: data.projectLocation || '',
+                        other: data.other || '',
+                        status: 'pending',
+                        type: selectedOption
+                    };
+                    scheduleData.push(record);
+                });
+            } else if (selectedOption === 'nanDaTang') {
+                const record = {
+                    id: Date.now().toString() + '-' + date + '-nanda',
+                    groupId: groupId,
+                    date: date,
+                    studio: '南大堂',
+                    programName: data.programName,
+                    department: data.department,
+                    applicant: data.applicant,
+                    broadcastSystem: '',
+                    projectLocation: '',
+                    other: data.other || '',
+                    status: 'pending',
+                    type: 'nanDaTang'
+                };
+                scheduleData.push(record);
+            } else {
+                const record = {
+                    id: Date.now().toString() + '-' + date,
+                    groupId: groupId,
+                    date: date,
+                    studio: selectedOption === 'studio' ? selectedStudios[0] || '' : '外场转播',
+                    programName: data.programName,
+                    department: data.department,
+                    applicant: data.applicant,
+                    broadcastSystem: data.broadcastSystem || '',
+                    projectLocation: data.projectLocation || '',
+                    other: data.other || '',
+                    status: 'pending',
+                    type: selectedOption
+                };
+                scheduleData.push(record);
+            }
+        });
+    }
+
+    goHome();
+    saveDataToCOS();
+});
+
+// 综艺演播室填单表单
+document.getElementById('studioForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (isReadOnly) return;
+    const formData = new FormData(this);
+    const equipmentData = Object.fromEntries(formData.entries());
+
+    const flows = {};
+    for (let i = 0; i < this.elements.length; i++) {
+        const el = this.elements[i];
+        if (el.name && el.name.startsWith('flow_')) {
+            const match = el.name.match(/flow_(.+?)_(start_date|start_time|end_time)_(\d+)/);
+            if (match) {
+                const flowName = match[1];
+                const fieldType = match[2];
+                const timeId = match[3];
+                if (!flows[flowName]) flows[flowName] = {};
+                if (!flows[flowName][timeId]) flows[flowName][timeId] = {};
+                flows[flowName][timeId][fieldType] = el.value;
+            }
+        }
+    }
+    const flowTimes = {};
+    Object.keys(flows).forEach(flowName => {
+        flowTimes[flowName] = [];
+        Object.keys(flows[flowName]).forEach(timeId => {
+            const t = flows[flowName][timeId];
+            if (t.start_date && t.start_time && t.end_time) {
+                flowTimes[flowName].push({
+                    startDate: t.start_date,
+                    startTime: t.start_time,
+                    endTime: t.end_time
+                });
+            }
+        });
+    });
+
+    const currentRecord = scheduleData.find(r => r.id === currentProgramId);
+    const batchGroupId = currentRecord ? currentRecord.groupId : null;
+    const records = batchGroupId
+        ? scheduleData.filter(r => r.groupId === batchGroupId)
+        : (currentRecord ? [currentRecord] : []);
+    const visitMode = document.getElementById('visitMode').checked;
+    records.forEach(record => {
+        record.equipment = equipmentData;
+        record.flowTimes = flowTimes;
+        record.visitMode = visitMode;
+        record.status = 'filled';
+    });
+
+    goHome();
+    saveDataToCOS();
+});
+
+// 外场填单表单
+document.getElementById('outsideForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (isReadOnly) return;
+    const formData = new FormData(this);
+    const equipmentData = Object.fromEntries(formData.entries());
+
+    const flows = {};
+    for (let i = 0; i < this.elements.length; i++) {
+        const el = this.elements[i];
+        if (el.name && el.name.startsWith('flow_')) {
+            const match = el.name.match(/flow_(.+?)_(start_date|start_time|end_time)_(\d+)/);
+            if (match) {
+                const flowName = match[1];
+                const fieldType = match[2];
+                const timeId = match[3];
+                if (!flows[flowName]) flows[flowName] = {};
+                if (!flows[flowName][timeId]) flows[flowName][timeId] = {};
+                flows[flowName][timeId][fieldType] = el.value;
+            }
+        }
+    }
+    const flowTimes = {};
+    Object.keys(flows).forEach(flowName => {
+        flowTimes[flowName] = [];
+        Object.keys(flows[flowName]).forEach(timeId => {
+            const t = flows[flowName][timeId];
+            if (t.start_date && t.start_time && t.end_time) {
+                flowTimes[flowName].push({
+                    startDate: t.start_date,
+                    startTime: t.start_time,
+                    endTime: t.end_time
+                });
+            }
+        });
+    });
+
+    const currentRecord = scheduleData.find(r => r.id === currentProgramId);
+    const batchGroupId = currentRecord ? currentRecord.groupId : null;
+    const records = batchGroupId
+        ? scheduleData.filter(r => r.groupId === batchGroupId)
+        : (currentRecord ? [currentRecord] : []);
+    records.forEach(record => {
+        record.equipment = equipmentData;
+        record.flowTimes = flowTimes;
+        record.status = 'filled';
+    });
+
+    goHome();
+    saveDataToCOS();
+});
+
+// 南大堂填单表单
+document.getElementById('nanDaTangForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (isReadOnly) return;
+    const formData = new FormData(this);
+    const equipmentData = Object.fromEntries(formData.entries());
+
+    const flows = {};
+    for (let i = 0; i < this.elements.length; i++) {
+        const el = this.elements[i];
+        if (el.name && el.name.startsWith('flow_')) {
+            const match = el.name.match(/flow_(.+?)_(start_date|start_time|end_time)_(\d+)/);
+            if (match) {
+                const flowName = match[1];
+                const fieldType = match[2];
+                const timeId = match[3];
+                if (!flows[flowName]) flows[flowName] = {};
+                if (!flows[flowName][timeId]) flows[flowName][timeId] = {};
+                flows[flowName][timeId][fieldType] = el.value;
+            }
+        }
+    }
+    const flowTimes = {};
+    Object.keys(flows).forEach(flowName => {
+        flowTimes[flowName] = [];
+        Object.keys(flows[flowName]).forEach(timeId => {
+            const t = flows[flowName][timeId];
+            if (t.start_date && t.start_time && t.end_time) {
+                flowTimes[flowName].push({
+                    startDate: t.start_date,
+                    startTime: t.start_time,
+                    endTime: t.end_time
+                });
+            }
+        });
+    });
+
+    const currentRecord = scheduleData.find(r => r.id === currentProgramId);
+    const batchGroupId = currentRecord ? currentRecord.groupId : null;
+    const records = batchGroupId
+        ? scheduleData.filter(r => r.groupId === batchGroupId)
+        : (currentRecord ? [currentRecord] : []);
+    records.forEach(record => {
+        record.equipment = equipmentData;
+        record.flowTimes = flowTimes;
+        record.status = 'filled';
+    });
+
+    goHome();
+    saveDataToCOS();
+});
+
+// 其他服务表单
+document.getElementById('otherServiceForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (isReadOnly) return;
+    const formData = new FormData(this);
+    const dates = [...new Set(otherServiceSelectedDates.filter(Boolean))].sort();
+    if (dates.length === 0) {
+        alert('请至少选择一个服务日期');
+        return;
+    }
+
+    const service = normalizeOtherService({
+        id: editingOtherServiceId || ('service_' + Date.now()),
+        programName: formData.get('programName'),
+        applicant: formData.get('applicant'),
+        serviceDetails: formData.get('serviceDetails'),
+        dates: dates,
+        type: 'otherService'
+    });
+
+    if (editingOtherServiceId) {
+        otherServices = otherServices.map(item => item.id === editingOtherServiceId ? service : item);
+    } else {
+        otherServices.push(service);
+    }
+    otherServices = normalizeOtherServiceList(otherServices);
+    closeOtherServiceModal();
+    renderTaskSheet();
+    saveDataToCOS();
+});
+
+// 日期输入监听
+document.getElementById('dateInput').addEventListener('change', function(e) {
+    const date = e.target.value;
+    if (date && !selectedDates.includes(date)) {
+        selectedDates.push(date);
+        renderSelectedDates();
+        checkReserveSubmit();
+    }
+    e.target.style.display = 'none';
+    e.target.value = '';
+});
+
+document.getElementById('otherServiceDateInput').addEventListener('change', function(e) {
+    const date = e.target.value;
+    if (date && !otherServiceSelectedDates.includes(date)) {
+        otherServiceSelectedDates.push(date);
+        otherServiceSelectedDates.sort();
+        renderSelectedDates('otherService');
+    }
+    e.target.style.display = 'none';
+    e.target.value = '';
+});
+
+// 日期范围弹窗监听
+document.addEventListener('DOMContentLoaded', function() {
+    const rangeStart = document.getElementById('rangeStart');
+    const rangeEnd = document.getElementById('rangeEnd');
+    if (rangeStart) rangeStart.addEventListener('change', updateRangePreview);
+    if (rangeEnd) rangeEnd.addEventListener('change', updateRangePreview);
+});
+
+// 预约表单输入监听
+document.querySelectorAll('#reserveForm input, #reserveForm select').forEach(el => {
+    if (el.type === 'checkbox') {
+        el.addEventListener('change', checkReserveSubmit);
+    } else {
+        el.addEventListener('input', checkReserveSubmit);
+    }
+});
+
+// ========== 排班编辑功能 ==========
+function parseShiftAssignees(value) {
+    return [...new Set(String(value || '')
+        .split(/[、,，\s\n\r]+/)
+        .map(name => name.trim())
+        .filter(Boolean))];
+}
+
+function collectDepartmentShiftRecords() {
+    const records = [];
+    document.querySelectorAll('#shiftDepartmentEditorContainer .shift-manual-input').forEach(input => {
+        const date = input.dataset.date;
+        const shiftType = input.dataset.shiftType;
+        const groupKey = input.dataset.groupKey;
+        const groupConfig = getShiftGroupConfig(groupKey);
+        if (!groupConfig) return;
+        const assignees = parseShiftAssignees(input.value);
+        if (assignees.length === 0) return;
+
+        records.push({
+            weekStart: getWeekStartFromDate(date),
+            date,
+            shiftType,
+            department: groupConfig.department,
+            groupKey: groupConfig.key,
+            groupName: groupConfig.groupName,
+            assignees
+        });
+    });
+
+    return records;
+}
+
+function bindShiftDepartmentEditorEvents() {
+    const container = document.getElementById('shiftDepartmentEditorContainer');
+    if (!container) return;
+    container.querySelectorAll('.shift-manual-input').forEach(input => {
+        input.addEventListener('input', () => {
+            input.style.height = 'auto';
+            input.style.height = `${input.scrollHeight}px`;
+        });
+    });
+}
+
+openShiftDepartmentModal = function() {
+    if (isReadOnly) return;
+    const modal = document.getElementById('shiftModal');
+    const title = document.getElementById('shiftEditTitle');
+    const container = document.getElementById('shiftDepartmentEditorContainer');
+    if (!modal || !title || !container) return;
+
+    title.textContent = `${selectedShiftDepartment} 排班`;
+    container.innerHTML = renderShiftDepartmentEditor(selectedShiftDepartment);
+    bindShiftDepartmentEditorEvents();
+    modal.style.display = 'flex';
+};
+
+openShiftEditor = function() {};
+openShiftModal = function() {};
+
+closeShiftModal = function() {
+    const modal = document.getElementById('shiftModal');
+    if (modal) modal.style.display = 'none';
+};
+
+saveShifts = function() {
+    if (isReadOnly) return;
+    const weekDates = new Set(getShiftWeekDates());
+    const departmentRecords = collectDepartmentShiftRecords();
+    shiftData.weekSchedules = shiftData.weekSchedules.filter(item => !(
+        item.department === selectedShiftDepartment &&
+        weekDates.has(item.date)
+    ));
+    shiftData.weekSchedules.push(...departmentRecords);
+    saveShiftsToCOS().then(success => {
+        if (!success) return;
+        closeShiftModal();
+        renderShiftBoard();
+    });
+};
+
+// 保存排班数据到COS
+async function saveShiftsToCOS() {
+    const data = {
+        weekSchedules: shiftData.weekSchedules
+            .map(item => normalizeShiftRecord(item))
+            .filter(Boolean),
+        updateTime: new Date().toISOString()
+    };
+    try {
+        await cos.putObject({
+            Bucket: COS_CONFIG._b1,
+            Region: COS_CONFIG._r1,
+            Key: 'data/shifts.json',
+            Body: JSON.stringify(data, null, 2),
+            ContentType: 'application/json; charset=utf-8'
+        });
+        const cloudStatus = document.getElementById('cloudStatus');
+        if (cloudStatus) {
+            cloudStatus.textContent = '☁️ 已同步';
+            cloudStatus.className = 'cloud-status success';
+        }
+        return true;
+    } catch (err) {
+        console.log('排班数据保存失败:', err);
+        alert('排班数据保存失败: ' + (err.message || err));
+        return false;
+    }
+}
+
+    </script>
+</body>
+</html>

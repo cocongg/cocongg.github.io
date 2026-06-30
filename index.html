@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>节目制作资源申请管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="readonly-mode">
+    <div id="page-home" class="page active">
+        <div class="container">
+            <div class="header">
+                <h1>节目制作资源申请管理系统</h1>
+                <div id="cloudStatus" class="cloud-status">📦 本地模式</div>
+            </div>
+
+            <div class="options">
+                <div class="option-card" onclick="selectOption('studio')">
+                    <div class="icon-wrapper icon-studio" style="width: 80px; height: 80px; font-size: 40px;">🎬</div>
+                    <div class="option-content">
+                        <h3 style="font-size: 20px;">综艺演播室</h3>
+                        <p style="font-size: 14px; color: #999; margin-top: 6px;">开放800演播室、1800演播室</p>
+                        <div class="click-hint">点击预约</div>
+                    </div>
+                </div>
+
+                <div class="option-card" onclick="selectOption('nanDaTang')">
+                    <div class="icon-wrapper icon-live" style="width: 80px; height: 80px; font-size: 40px;">🏛️</div>
+                    <div class="option-content">
+                        <h3 style="font-size: 20px;">南大堂</h3>
+                        <div class="click-hint">点击选择</div>
+                    </div>
+                </div>
+
+                <div class="option-card" onclick="selectOption('outside')">
+                    <div class="icon-wrapper icon-outside" style="width: 80px; height: 80px; font-size: 40px;">🎥</div>
+                    <div class="option-content">
+                        <h3 style="font-size: 20px;">外场转播</h3>
+                        <div class="click-hint">点击预约</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <div class="section-title" style="margin-bottom: 0;">预约排期表</div>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="downloadScheduleExcel()" style="padding: 8px 20px; font-size: 14px; margin-right: 10px;">📥 下载排期表</button>
+                    <button type="button" class="btn btn-primary" onclick="showStatistics()" style="padding: 8px 20px; font-size: 14px; margin-right: 10px;">📊 数据统计</button>
+                    <button type="button" class="btn btn-primary" onclick="showTaskSheet()" style="padding: 8px 20px; font-size: 14px;">📋 任务单</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table class="schedule-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>800演播室</th>
+                            <th>1800演播室</th>
+                            <th>南大堂</th>
+                            <th>外场转播活动</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scheduleBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <button class="back-to-top" id="backToTop" onclick="scrollToTop()">↑</button>
+
+    <div id="page-reserve" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1 id="reserveTitle">预约申请</h1>
+                <p id="reserveSubtitle">请填写预约信息，可选择多个日期</p>
+            </div>
+
+            <form id="reserveForm">
+                <input type="hidden" name="editId">
+                <div class="form-section">
+                    <div class="section-title">基本信息</div>
+                    <div class="form-group">
+                        <label>节目名称 *</label>
+                        <input type="text" name="programName" required placeholder="请输入节目名称">
+                    </div>
+                    <div class="form-group">
+                        <label>部门 *</label>
+                        <input type="text" name="department" required placeholder="请输入部门名称">
+                    </div>
+                    <div class="form-group">
+                        <label>申请人 *</label>
+                        <input type="text" name="applicant" required placeholder="请输入申请人姓名">
+                    </div>
+                    <div class="form-group" id="broadcastSystemGroup" style="display: none;">
+                        <label>转播系统</label>
+                        <input type="text" name="broadcastSystem" placeholder="请输入转播系统">
+                    </div>
+                    <div class="form-group" id="projectLocationGroup" style="display: none;">
+                        <label>项目地点</label>
+                        <input type="text" name="projectLocation" placeholder="请输入项目地点">
+                    </div>
+                    <div class="form-group">
+                        <label>预约日期 *</label>
+                        <input type="hidden" id="datesHidden" name="dates">
+                        <div class="dates-select" id="datesSelect">
+                            <input type="date" id="dateInput" style="display: none;">
+                            <button type="button" class="add-date-btn" onclick="addDate()">+ 添加日期</button>
+                            <button type="button" class="add-date-btn" onclick="showDateRangeModal()" style="margin-left: 8px;">📅 连续多日</button>
+                        </div>
+                        <div id="selectedDates" class="dates-select"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>其他</label>
+                        <textarea name="other" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="form-section" id="studioSelectSection">
+                    <div class="section-title">演播室选择 *</div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="studio" value="800">
+                                <span>800</span>
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="studio" value="1800">
+                                <span>1800</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm" id="reserveSubmitBtn" disabled>确认预约</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-task" class="page">
+        <div class="container" style="max-width: 1600px;">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>任务单</h1>
+                <p id="taskWeekLabel">任务单周次</p>
+            </div>
+
+            <div class="task-toolbar">
+                <div class="task-stat">
+                    <div class="task-stat-item">已确认节目：<strong id="taskFilledCount">0</strong></div>
+                    <div class="task-stat-item">涉及日期：<strong id="taskDateCount">0</strong></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="week-switch-group">
+                        <button type="button" class="week-switch-btn" id="taskCurrentWeekBtn" onclick="changeTaskWeek('current')">本周任务单</button>
+                        <button type="button" class="week-switch-btn" id="taskNextWeekBtn" onclick="changeTaskWeek('next')">下周任务单</button>
+                    </div>
+                    <input type="text" id="taskSearchInput" placeholder="搜索节目名/部门/申请人" oninput="searchTaskSheet()" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; width: 220px;">
+                    <button type="button" class="btn btn-primary" onclick="showShiftBoard()" style="padding: 8px 20px; font-size: 14px;">👥 部门排班</button>
+                    <button type="button" class="btn btn-primary" onclick="addOtherService()" style="padding: 8px 20px; font-size: 14px;">➕ 添加其他服务</button>
+                    <button type="button" class="btn btn-primary" onclick="generateCurrentWeeklyTaskSheet()" style="padding: 8px 20px; font-size: 14px; white-space: nowrap;">📅 生成本周任务单</button>
+                    <button type="button" class="btn btn-primary" onclick="generateWeeklyTaskSheet()" style="padding: 8px 20px; font-size: 14px; white-space: nowrap;">📅 生成下周任务单</button>
+                </div>
+            </div>
+
+            <div class="table-container" id="taskSheetContainer">
+                <table class="task-sheet-table">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>800演播室</th>
+                            <th>1800演播室</th>
+                            <th>南大堂</th>
+                            <th>4K车</th>
+                            <th>高清车</th>
+                            <th>4K EFP</th>
+                            <th>高清EFP</th>
+                            <th>简易EFP</th>
+                            <th>其他服务</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskSheetBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-statistics" class="page">
+        <div class="container" style="max-width: 1400px;">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>数据统计</h1>
+                <p>当前数据统计分析</p>
+            </div>
+
+            <div id="statisticsContent">
+                <p style="text-align: center; color: #999; padding: 40px;">加载中...</p>
+            </div>
+
+            <div class="header" style="margin-top: 40px;">
+                <h2>历史数据归档</h2>
+                <p>查看历史保存的数据快照</p>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <button type="button" class="btn btn-primary" onclick="loadHistoryList()" style="padding: 8px 20px; font-size: 14px;">🔄 刷新历史列表</button>
+            </div>
+
+            <div id="historyList" style="margin-top: 16px;">
+                <p style="text-align: center; color: #999; padding: 20px;">点击上方按钮加载历史归档列表</p>
+            </div>
+
+            <div id="historyDetail" style="margin-top: 24px;"></div>
+        </div>
+    </div>
+
+    <div id="dateRangeModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3>选择连续日期</h3>
+                <button type="button" class="btn-close" onclick="closeDateRangeModal()">×</button>
+            </div>
+            <div class="form-section">
+                <div class="form-group">
+                    <label>开始日期 *</label>
+                    <input type="date" id="rangeStart">
+                </div>
+                <div class="form-group">
+                    <label>结束日期 *</label>
+                    <input type="date" id="rangeEnd">
+                </div>
+                <p id="rangePreview" style="font-size: 13px; color: #666; margin-top: 8px;"></p>
+            </div>
+            <div class="btn-container">
+                <button type="button" class="btn btn-secondary" onclick="closeDateRangeModal()">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmDateRange()">确定添加</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="otherServiceModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加其他服务</h3>
+                <button type="button" class="btn-close" onclick="closeOtherServiceModal()">×</button>
+            </div>
+            <form id="otherServiceForm">
+                <div class="form-section">
+                    <div class="form-group">
+                        <label>日期</label>
+                        <input type="date" name="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>节目名称</label>
+                        <input type="text" name="programName" required placeholder="请输入节目名称">
+                    </div>
+                    <div class="form-group">
+                        <label>申请人</label>
+                        <input type="text" name="applicant" required placeholder="请输入申请人">
+                    </div>
+                    <div class="form-group">
+                        <label>服务明细</label>
+                        <textarea name="serviceDetails" rows="4" placeholder="请输入服务明细"></textarea>
+                    </div>
+                </div>
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="closeOtherServiceModal()">取消</button>
+                    <button type="submit" class="btn btn-confirm">确认添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-studio" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>综艺演播室申请单</h1>
+                <p>节目：<span id="currentProgramName"></span></p>
+            </div>
+
+            <form id="studioForm">
+                <div class="form-section">
+                    <div class="section-title">模式选择</div>
+                    <div class="form-group">
+                        <label class="checkbox-item" style="width: auto; min-width: 150px;">
+                            <input type="checkbox" name="visitMode" id="visitMode" onchange="toggleVisitMode()">
+                            <span>参观模式</span>
+                            <span style="font-size: 12px; color: #94a3b8; font-weight: normal; margin-left: 8px;">勾选后无需填写流程安排和设备需求</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-section" id="flowSection">
+                    <div class="section-title">流程安排</div>
+                    <div class="flow-items" id="flowItems">
+                        <div class="flow-item" data-flow="装台">
+                            <div class="flow-header">
+                                <span class="flow-name">装台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('装台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-装台"></div>
+                        </div>
+                        <div class="flow-item" data-flow="场地">
+                            <div class="flow-header">
+                                <span class="flow-name">场地</span>
+                                <span class="flow-desc">（包含场地）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('场地')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-场地"></div>
+                        </div>
+                        <div class="flow-item" data-flow="装调灯">
+                            <div class="flow-header">
+                                <span class="flow-name">装调灯</span>
+                                <span class="flow-desc">（包含场地、灯光）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('装调灯')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-装调灯"></div>
+                        </div>
+                        <div class="flow-item" data-flow="不带机彩排">
+                            <div class="flow-header">
+                                <span class="flow-name">不带机彩排</span>
+                                <span class="flow-desc">（包含场地、灯光、音响）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('不带机彩排')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-不带机彩排"></div>
+                        </div>
+                        <div class="flow-item" data-flow="带机彩排">
+                            <div class="flow-header">
+                                <span class="flow-name">带机彩排</span>
+                                <span class="flow-desc">（包含场地、灯光、音响、视讯）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('带机彩排')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-带机彩排"></div>
+                        </div>
+                        <div class="flow-item" data-flow="录制">
+                            <div class="flow-header">
+                                <span class="flow-name">录制</span>
+                                <span class="flow-desc">（包含场地、灯光、音响、视讯）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('录制')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-录制"></div>
+                        </div>
+                        <div class="flow-item" data-flow="直播">
+                            <div class="flow-header">
+                                <span class="flow-name">直播</span>
+                                <span class="flow-desc">（包含场地、灯光、音响、视讯）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('直播')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-直播"></div>
+                        </div>
+                        <div class="flow-item" data-flow="拆台">
+                            <div class="flow-header">
+                                <span class="flow-name">拆台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTime('拆台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-拆台"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section" id="equipmentSection">
+                    <div class="section-title">设备需求</div>
+                    <div class="form-group">
+                        <label>摄像机数 *</label>
+                        <div class="number-input">
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, -1)">-</button>
+                            <input type="number" name="cameraCount" value="6" min="1" max="20" required>
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>是否需要摇臂 *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="是" required>
+                                <span class="radio-btn"></span>
+                                <span>是</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="否" required>
+                                <span class="radio-btn"></span>
+                                <span>否</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>是否需要屏控 *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="screenControl" value="是" required>
+                                <span class="radio-btn"></span>
+                                <span>是</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="screenControl" value="否" required>
+                                <span class="radio-btn"></span>
+                                <span>否</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>其他需求</label>
+                        <textarea name="otherRequirements" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-outside" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>外场转播申请单</h1>
+                <p>节目：<span id="currentProgramNameOutside"></span></p>
+            </div>
+
+            <form id="outsideForm">
+                <div class="form-section">
+                        <div class="section-title">流程安排</div>
+                        <div class="flow-items" id="flowItemsOutside">
+                            <div class="flow-item" data-flow="搭建调试">
+                                <div class="flow-header">
+                                    <span class="flow-name">搭建调试</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('搭建调试')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-搭建调试"></div>
+                            </div>
+                            <div class="flow-item" data-flow="彩排">
+                                <div class="flow-header">
+                                    <span class="flow-name">彩排</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('彩排')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-彩排"></div>
+                            </div>
+                        </div>
+                        <div class="flow-items" id="flowItemsOutside2">
+                            <div class="flow-item" data-flow="zhibo">
+                                <div class="flow-header">
+                                    <span class="flow-name">直播</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('zhibo')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-zhibo"></div>
+                            </div>
+                            <div class="flow-item" data-flow="luzhi">
+                                <div class="flow-header">
+                                    <span class="flow-name">录制</span>
+                                    <button type="button" class="flow-add-btn" onclick="addFlowTime('luzhi')">+ 添加时间</button>
+                                </div>
+                                <div class="flow-times" id="flow-times-luzhi"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title">设备需求</div>
+                        <div class="form-group">
+                            <label>转播系统 *</label>
+                            <select name="broadcastSystem" required>
+                                <option value="">请选择转播系统</option>
+                                <option value="4K车">4K车</option>
+                                <option value="高清车">高清车</option>
+                                <option value="4K EFP">4K EFP</option>
+                                <option value="高清EFP">高清EFP</option>
+                                <option value="简易EFP">简易EFP</option>
+                            </select>
+                        </div>
+                    <div class="form-group">
+                        <label>摄像机数 *</label>
+                        <div class="number-input">
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, -1)">-</button>
+                            <input type="number" name="cameraCount" value="6" min="1" max="20" required>
+                            <button type="button" class="number-btn" onclick="adjustCameraCount(this, 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>是否需要摇臂 *</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="是" required>
+                                <span class="radio-btn"></span>
+                                <span>是</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="jib" value="否" required>
+                                <span class="radio-btn"></span>
+                                <span>否</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="section-title">其他需求</div>
+                    <div class="form-group">
+                        <label>其他需求</label>
+                        <textarea name="otherRequirements" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-nanDaTang" class="page">
+        <div class="container">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>南大堂申请单</h1>
+                <p>节目：<span id="currentProgramNameNanDaTang"></span></p>
+            </div>
+
+            <form id="nanDaTangForm">
+                <div class="form-section">
+                    <div class="section-title">流程安排</div>
+                    <div class="flow-items" id="flowItemsNanDaTang">
+                        <div class="flow-item" data-flow="装台">
+                            <div class="flow-header">
+                                <span class="flow-name">装台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('装台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-装台"></div>
+                        </div>
+                        <div class="flow-item" data-flow="彩排">
+                            <div class="flow-header">
+                                <span class="flow-name">彩排</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('彩排')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-彩排"></div>
+                        </div>
+                        <div class="flow-item" data-flow="演出">
+                            <div class="flow-header">
+                                <span class="flow-name">演出</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('演出')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-演出"></div>
+                        </div>
+                        <div class="flow-item" data-flow="撤台">
+                            <div class="flow-header">
+                                <span class="flow-name">撤台</span>
+                                <span class="flow-desc">（4-7点为强制休息时间）</span>
+                                <button type="button" class="flow-add-btn" onclick="addFlowTimeNanDaTang('撤台')">+ 添加时间</button>
+                            </div>
+                            <div class="flow-times" id="flow-times-ndt-撤台"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="section-title">设备需求</div>
+                    <div class="form-group">
+                        <label>其他需求</label>
+                        <textarea name="otherRequirements" placeholder="请输入其他需求或备注"></textarea>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="button" class="btn btn-cancel" onclick="goHome()">取消</button>
+                    <button type="submit" class="btn btn-confirm">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="page-shift" class="page">
+        <div class="container" style="max-width: 1600px;">
+            <div class="back-link" onclick="goHome()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回首页
+            </div>
+
+            <div class="header">
+                <h1>部门排班</h1>
+                <p id="shiftWeekLabel">排班周</p>
+            </div>
+
+            <div class="task-toolbar">
+                <div class="task-stat">
+                    <div class="task-stat-item">总表只看结果，选择部门后进入本部门排班</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="week-switch-group">
+                        <button type="button" class="week-switch-btn" id="shiftCurrentWeekBtn" onclick="changeShiftWeek('current')">本周排班</button>
+                        <button type="button" class="week-switch-btn" id="shiftNextWeekBtn" onclick="changeShiftWeek('next')">下周排班</button>
+                    </div>
+                    <select id="shiftDepartmentSelect" onchange="changeShiftDepartment(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; min-width: 180px;"></select>
+                    <button type="button" class="btn btn-primary" id="shiftEditDepartmentBtn" onclick="openShiftDepartmentModal()" style="padding: 8px 20px; font-size: 14px;">📝 开始排班</button>
+                    <button type="button" class="btn btn-primary" onclick="exportShiftBoard()" style="padding: 8px 20px; font-size: 14px;">📊 导出Excel</button>
+                </div>
+            </div>
+
+            <div class="table-container" id="shiftBoardContainer">
+                <p style="text-align: center; color: #999; padding: 40px;">加载中...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="shiftModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content shift-editor-modal">
+            <div class="modal-header">
+                <h3 id="shiftEditTitle">部门排班</h3>
+                <button type="button" class="btn-close" onclick="closeShiftModal()">×</button>
+            </div>
+
+            <div class="form-section">
+                <div id="shiftDepartmentEditorContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

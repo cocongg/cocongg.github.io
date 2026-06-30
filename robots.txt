@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /backup.html
+Disallow: /edit.html
+Disallow: /edit.js

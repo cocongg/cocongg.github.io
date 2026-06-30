@@ -1,0 +1,11 @@
+title: 节目制作资源申请管理系统
+exclude:
+  - README.md
+  - backup.html
+  - edit.html
+  - _config.yml
+  - .gitignore
+  - node_modules
+  - vendor
+  - Gemfile
+  - Gemfile.lock

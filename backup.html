@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COS 数据备份工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/cos-js-sdk-v5/dist/cos-js-sdk-v5.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        .backup-container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+        }
+        .backup-header {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 20px;
+            margin-bottom: 28px;
+        }
+        .backup-header h1 {
+            font-size: 26px;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .backup-header p {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #374151;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #9ca3af;
+        }
+        .status-dot.success { background: #10b981; }
+        .status-dot.error { background: #ef4444; }
+        .status-dot.loading { background: #f59e0b; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .section-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 18px;
+            background: #fafafa;
+        }
+        .section-card h3 {
+            font-size: 16px;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+        .section-card .desc {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 14px;
+        }
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .btn {
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: #4f46e5;
+            color: #ffffff;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #4338ca;
+        }
+        .btn-secondary {
+            background: #ffffff;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #f9fafb;
+        }
+        .btn-success {
+            background: #10b981;
+            color: #ffffff;
+        }
+        .btn-success:hover:not(:disabled) {
+            background: #059669;
+        }
+        .log-panel {
+            background: #111827;
+            color: #d1d5db;
+            border-radius: 10px;
+            padding: 16px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        .log-panel .log-time {
+            color: #6b7280;
+        }
+        .log-panel .log-success { color: #10b981; }
+        .log-panel .log-error { color: #ef4444; }
+        .log-panel .log-info { color: #60a5fa; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            background: #f3f4f6;
+            padding: 14px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .summary-item .num {
+            font-size: 22px;
+            font-weight: 700;
+            color: #1f2937;
+        }
+        .summary-item .label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="backup-container">
+        <div class="backup-header">
+            <h1>📦 COS 数据备份工具</h1>
+            <p>将腾讯云 COS 中的节目排期、排班、历史归档等数据导出为 CSV 文件，保存到本地（浏览器默认下载目录）。</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">准备就绪</span>
+        </div>
+
+        <div id="summaryArea"></div>
+
+        <div class="section-card">
+            <h3>📅 最新排期数据 (data/latest.json)</h3>
+            <div class="desc">包含 scheduleData（节目排期）和 otherServices（其他服务），拆分为两个 CSV 文件下载。</div>
+            <div class="btn-row">
+                <button class="btn btn-primary" id="btnLatest" onclick="backupLatest()">⬇ 导出最新排期</button>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h3>👥 部门排班数据 (data/shifts.json)</h3>
+            <div class="desc">将排班数据导出为 CSV。</div>
+            <div class="btn-row">
+                <button class="btn btn-primary" id="btnShifts" onclick="backupShifts()">⬇ 导出排班</button>
+            </div>
+        </div>
+
+        <div class="section-card">
+            <h3>🗂 历史归档列表 (data/history/)</h3>
+            <div class="desc">加载历史快照列表，可选择单个快照或批量导出全部历史快照为 CSV。</div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" id="btnListHistory" onclick="listHistory()">🔄 加载历史列表</button>
+                <button class="btn btn-primary" id="btnExportAllHistory" onclick="backupAllHistory()" disabled>⬇ 批量导出全部历史</button>
+            </div>
+            <div id="historyList" style="margin-top: 14px;"></div>
+        </div>
+
+        <div class="section-card">
+            <h3>🧹 一键全量备份</h3>
+            <div class="desc">一次性导出所有 COS 数据（最新排期 + 排班 + 全部历史快照）到本地。</div>
+            <div class="btn-row">
+                <button class="btn btn-success" id="btnAll" onclick="backupAll()">💾 一键全量备份</button>
+            </div>
+        </div>
+
+        <div class="log-panel" id="logPanel"></div>
+    </div>
+
+    <script>
+        const COS_CONFIG = {
+            _s1: atob('QUtJRGhtYVE2YXJ1bERWVUl1TFlZUjZZZ2JKcEFJRzFhdzYz'),
+            _s2: atob('bVZBakFUeEtaaGhjUDVuT3JDUmFiVkl6WHhHVWFZUDg='),
+            _b1: 'form-' + atob('MTQ0NjA1MzM1Nw=='),
+            _r1: atob('YXAtZ3Vhbmd6aG91')
+        };
+
+        const cos = new COS({
+            SecretId: COS_CONFIG._s1,
+            SecretKey: COS_CONFIG._s2
+        });
+
+        let historyItems = [];
+
+        function setStatus(text, type) {
+            document.getElementById('statusText').textContent = text;
+            const dot = document.getElementById('statusDot');
+            dot.className = 'status-dot' + (type ? ' ' + type : '');
+        }
+
+        function log(msg, type) {
+            const panel = document.getElementById('logPanel');
+            const time = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.innerHTML = `<span class="log-time">[${time}]</span> <span class="${type || ''}">${msg}</span>`;
+            panel.appendChild(line);
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        function cosBodyToString(body) {
+            if (typeof body === 'string') return body;
+            if (body instanceof ArrayBuffer) return new TextDecoder('utf-8').decode(body);
+            if (body && typeof body.toString === 'function') return body.toString();
+            return '';
+        }
+
+        function escapeCSV(val) {
+            if (val === null || val === undefined) return '';
+            let s = String(val);
+            if (s.indexOf('"') !== -1) s = s.replace(/"/g, '""');
+            if (/[",\r\n]/.test(s)) s = '"' + s + '"';
+            return s;
+        }
+
+        function toCSV(rows, headers) {
+            const lines = [headers.map(h => escapeCSV(h)).join(',')];
+            rows.forEach(row => {
+                lines.push(headers.map(h => escapeCSV(row[h] !== undefined ? row[h] : '')).join(','));
+            });
+            return '\uFEFF' + lines.join('\r\n');
+        }
+
+        function downloadCSV(filename, csvText) {
+            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            log('✅ 已下载：' + filename, 'success');
+        }
+
+        function nowForFilename() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+        }
+
+        function scheduleRecordToRow(r) {
+            const flowTimes = r.flowTimes || {};
+            const flowSummary = Object.keys(flowTimes).map(k => {
+                const times = (flowTimes[k] || []).join(';');
+                return `${k}:${times}`;
+            }).join(' | ');
+            return {
+                'ID': r.id || '',
+                '类型': r.type || '',
+                '日期': r.date || '',
+                '场地/演播室': r.studio || '',
+                '节目名称': r.programName || '',
+                '部门': r.department || '',
+                '申请人': r.applicant || '',
+                '转播系统': r.broadcastSystem || '',
+                '项目地点': r.projectLocation || '',
+                '状态': r.status || '',
+                '参观模式': r.visitMode ? '是' : '否',
+                '摄像机数': (r.equipment && r.equipment.cameraCount) || r.cameraCount || '',
+                '摇臂': (r.equipment && r.equipment.jib) || r.jib || '',
+                '屏控': (r.equipment && r.equipment.screenControl) || r.screenControl || '',
+                '其他需求': (r.equipment && r.equipment.otherRequirements) || r.otherRequirements || r.other || '',
+                '流程安排': flowSummary,
+                '备注': r.other || ''
+            };
+        }
+
+        function otherServiceToRow(svc) {
+            const dates = Array.isArray(svc.dates) ? svc.dates.join(';') : (svc.date || '');
+            return {
+                'ID': svc.id || '',
+                '类型': 'otherService',
+                '服务日期': dates,
+                '节目名称': svc.programName || '',
+                '申请人': svc.applicant || '',
+                '服务明细': svc.serviceDetails || '',
+                '状态': svc.status || ''
+            };
+        }
+
+        function shiftToRow(record) {
+            return {
+                'ID': record.id || '',
+                '周起始': record.weekStart || '',
+                '日期': record.date || '',
+                '部门': record.department || '',
+                '分组': record.groupName || record.groupKey || '',
+                '分组Key': record.groupKey || '',
+                '班次类型': record.shiftType || '',
+                '人员': Array.isArray(record.assignees) ? record.assignees.join(';') : (record.assignees || ''),
+                '角色': Array.isArray(record.roles) ? record.roles.join(';') : (record.roles || '')
+            };
+        }
+
+        async function backupLatest() {
+            setStatus('正在读取 latest.json...', 'loading');
+            log('📡 请求 data/latest.json ...', 'info');
+            try {
+                const result = await cos.getObject({
+                    Bucket: COS_CONFIG._b1,
+                    Region: COS_CONFIG._r1,
+                    Key: 'data/latest.json'
+                });
+                const data = JSON.parse(cosBodyToString(result.Body));
+                const scheduleData = data.scheduleData || [];
+                const otherServices = data.otherServices || [];
+
+                log(`📋 读取成功：排期 ${scheduleData.length} 条，其他服务 ${otherServices.length} 条`, 'info');
+
+                const scheduleHeaders = ['ID','类型','日期','场地/演播室','节目名称','部门','申请人','转播系统','项目地点','状态','参观模式','摄像机数','摇臂','屏控','其他需求','流程安排','备注'];
+                const scheduleRows = scheduleData.map(scheduleRecordToRow);
+                downloadCSV(`schedule_${nowForFilename()}.csv`, toCSV(scheduleRows, scheduleHeaders));
+
+                const osHeaders = ['ID','类型','服务日期','节目名称','申请人','服务明细','状态'];
+                const osRows = otherServices.map(otherServiceToRow);
+                downloadCSV(`other_services_${nowForFilename()}.csv`, toCSV(osRows, osHeaders));
+
+                showSummary({ '排期记录': scheduleRows.length, '其他服务': osRows.length, '备份时间': data.backupTime || '-' });
+                setStatus('最新排期导出完成', 'success');
+            } catch (err) {
+                log('❌ 导出失败：' + (err.message || err), 'error');
+                setStatus('导出失败', 'error');
+                alert('导出 latest.json 失败：' + (err.message || err));
+            }
+        }
+
+        async function backupShifts() {
+            setStatus('正在读取 shifts.json...', 'loading');
+            log('📡 请求 data/shifts.json ...', 'info');
+            try {
+                const result = await cos.getObject({
+                    Bucket: COS_CONFIG._b1,
+                    Region: COS_CONFIG._r1,
+                    Key: 'data/shifts.json'
+                });
+                const data = JSON.parse(cosBodyToString(result.Body));
+                const records = (data && data.records) ? data.records : (Array.isArray(data) ? data : []);
+                log(`👥 读取成功：排班 ${records.length} 条`, 'info');
+
+                const headers = ['ID','周起始','日期','部门','分组','分组Key','班次类型','人员','角色'];
+                const rows = records.map(shiftToRow);
+                downloadCSV(`shifts_${nowForFilename()}.csv`, toCSV(rows, headers));
+
+                setStatus('排班导出完成', 'success');
+            } catch (err) {
+                log('❌ 导出失败：' + (err.message || err), 'error');
+                setStatus('导出失败', 'error');
+                alert('导出 shifts.json 失败：' + (err.message || err));
+            }
+        }
+
+        async function listHistory() {
+            setStatus('正在读取历史归档列表...', 'loading');
+            log('📡 列出 data/history/ ...', 'info');
+            try {
+                const result = await cos.getBucket({
+                    Bucket: COS_CONFIG._b1,
+                    Region: COS_CONFIG._r1,
+                    Prefix: 'data/history/',
+                    MaxKeys: 200
+                });
+                historyItems = (result.Contents || []).filter(i => i.Key && i.Key.endsWith('.json'));
+                historyItems.sort((a, b) => b.Key.localeCompare(a.Key));
+                log(`📚 历史快照 ${historyItems.length} 个`, 'info');
+                renderHistoryList();
+                document.getElementById('btnExportAllHistory').disabled = historyItems.length === 0;
+                setStatus(`加载完成，共 ${historyItems.length} 个快照`, 'success');
+            } catch (err) {
+                log('❌ 加载失败：' + (err.message || err), 'error');
+                setStatus('加载失败', 'error');
+                alert('加载历史列表失败：' + (err.message || err));
+            }
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('historyList');
+            if (historyItems.length === 0) {
+                list.innerHTML = '<p style="color:#9ca3af; font-size:13px;">暂无历史归档</p>';
+                return;
+            }
+            let html = '<div style="max-height:260px; overflow-y:auto; border:1px solid #e5e7eb; border-radius:8px;">';
+            html += '<table style="width:100%; border-collapse: collapse; font-size:13px;"><thead style="background:#f9fafb; position:sticky; top:0;"><tr>';
+            html += '<th style="text-align:left; padding:8px;">归档文件</th>';
+            html += '<th style="text-align:right; padding:8px;">大小</th>';
+            html += '<th style="text-align:right; padding:8px;">操作</th>';
+            html += '</tr></thead><tbody>';
+            historyItems.forEach((item, idx) => {
+                const fileName = item.Key.split('/').pop();
+                const sizeKB = ((item.Size || 0) / 1024).toFixed(1);
+                html += `<tr style="border-top:1px solid #f3f4f6;">
+                    <td style="padding:8px; color:#374151; font-family:Consolas,monospace;">${fileName}</td>
+                    <td style="padding:8px; text-align:right; color:#6b7280;">${sizeKB} KB</td>
+                    <td style="padding:8px; text-align:right;">
+                        <button class="btn btn-primary" style="padding:4px 10px; font-size:12px;" onclick="backupOneHistory(${idx})">⬇ 导出</button>
+                    </td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
+            list.innerHTML = html;
+        }
+
+        async function backupOneHistory(idx) {
+            const item = historyItems[idx];
+            if (!item) return;
+            setStatus('正在读取：' + item.Key, 'loading');
+            log('📡 读取 ' + item.Key, 'info');
+            try {
+                const result = await cos.getObject({
+                    Bucket: COS_CONFIG._b1,
+                    Region: COS_CONFIG._r1,
+                    Key: item.Key
+                });
+                const data = JSON.parse(cosBodyToString(result.Body));
+                const snapshot = data.scheduleData || [];
+                const otherServices = data.otherServices || [];
+
+                const baseName = item.Key.split('/').pop().replace('.json', '');
+                const headers = ['ID','类型','日期','场地/演播室','节目名称','部门','申请人','转播系统','项目地点','状态','参观模式','摄像机数','摇臂','屏控','其他需求','流程安排','备注'];
+                const rows = snapshot.map(scheduleRecordToRow);
+                downloadCSV(`snapshot_${baseName}_schedule.csv`, toCSV(rows, headers));
+
+                if (otherServices && otherServices.length > 0) {
+                    const osHeaders = ['ID','类型','服务日期','节目名称','申请人','服务明细','状态'];
+                    const osRows = otherServices.map(otherServiceToRow);
+                    downloadCSV(`snapshot_${baseName}_other.csv`, toCSV(osRows, osHeaders));
+                }
+                log(`✅ 完成：${baseName}（排期 ${rows.length} 条，其他服务 ${otherServices.length} 条）`, 'success');
+                setStatus('快照导出完成', 'success');
+            } catch (err) {
+                log('❌ 失败：' + (err.message || err), 'error');
+                setStatus('导出失败', 'error');
+            }
+        }
+
+        async function backupAllHistory() {
+            if (historyItems.length === 0) {
+                alert('请先点击"加载历史列表"');
+                return;
+            }
+            if (!confirm(`将导出 ${historyItems.length} 个历史快照为 CSV 文件，可能会下载较多文件，是否继续？`)) return;
+            setStatus('开始批量导出...', 'loading');
+            log(`🚀 开始批量导出 ${historyItems.length} 个历史快照`, 'info');
+            for (let i = 0; i < historyItems.length; i++) {
+                await backupOneHistory(i);
+            }
+            setStatus('批量导出完成', 'success');
+            log('🎉 全部历史快照导出完成', 'success');
+        }
+
+        async function backupAll() {
+            setStatus('开始全量备份...', 'loading');
+            log('🚀 开始全量备份', 'info');
+            try {
+                await backupLatest();
+            } catch (e) {}
+            try {
+                await backupShifts();
+            } catch (e) {}
+            try {
+                await listHistory();
+                if (historyItems.length > 0) {
+                    await backupAllHistory();
+                }
+            } catch (e) {}
+            setStatus('全量备份完成', 'success');
+            log('🎉 全量备份流程完成', 'success');
+        }
+
+        function showSummary(stats) {
+            const area = document.getElementById('summaryArea');
+            let html = '<div class="summary-grid">';
+            Object.keys(stats).forEach(k => {
+                html += `<div class="summary-item"><div class="num">${stats[k]}</div><div class="label">${k}</div></div>`;
+            });
+            html += '</div>';
+            area.innerHTML = html;
+        }
+
+        window.addEventListener('load', () => {
+            setStatus('准备就绪', 'success');
+            log('✅ 页面加载完成，COS 客户端已初始化', 'success');
+        });
+    </script>
+</body>
+</html>
