@@ -692,17 +692,6 @@
 // 覆盖只读模式标志
 isReadOnly = false;
 
-// ========== 密码验证 ==========
-const OPERATION_PASSWORD = '501501';
-
-function verifyPassword(callback) {
-    const pwd = prompt('请输入操作密码：');
-    if (pwd === OPERATION_PASSWORD) {
-        callback();
-    } else if (pwd !== null) {
-        alert('密码错误，操作已拒绝');
-    }
-}
 let otherServiceSelectedDates = [];
 let editingOtherServiceId = null;
 let activeDatePickerContext = 'reserve';
@@ -793,6 +782,15 @@ saveDataToCOS = async function() {
     }
 };
 
+async function saveDataAndGoHome() {
+    const saved = await saveDataToCOS();
+    if (saved) {
+        goHome();
+    } else {
+        alert('保存失败，请检查网络后重试');
+    }
+}
+
 // ========== 云端备份 ==========
 backupToCloud = function() {
     if (isReadOnly) return;
@@ -802,7 +800,6 @@ backupToCloud = function() {
 // ========== 其他服务 ==========
 addOtherService = function() {
     if (isReadOnly) return;
-    verifyPassword(() => {
     editingOtherServiceId = null;
     document.getElementById('otherServiceForm').reset();
     document.getElementById('otherServiceModalTitle').textContent = '添加其他服务';
@@ -811,12 +808,10 @@ addOtherService = function() {
     otherServiceSelectedDates = [new Date().toISOString().split('T')[0]];
     renderSelectedDates('otherService');
     document.getElementById('otherServiceModal').style.display = 'flex';
-    });
 };
 
 editOtherService = function(id) {
     if (isReadOnly) return;
-    verifyPassword(() => {
     const service = normalizeOtherServiceList(otherServices).find(item => item.id === id);
     if (!service) return;
 
@@ -831,7 +826,6 @@ editOtherService = function(id) {
     otherServiceSelectedDates = [...getOtherServiceDates(service)];
     renderSelectedDates('otherService');
     document.getElementById('otherServiceModal').style.display = 'flex';
-    });
 };
 
 closeOtherServiceModal = function() {
@@ -844,13 +838,11 @@ closeOtherServiceModal = function() {
 
 deleteOtherService = function(id) {
     if (isReadOnly) return;
-    verifyPassword(() => {
     if (confirm('确定要删除这条其他服务吗？')) {
         otherServices = otherServices.filter(s => s.id !== id);
         renderTaskSheet();
         saveDataToCOS();
     }
-    });
 };
 
 // ========== 生成每周任务单PDF ==========
@@ -1293,7 +1285,6 @@ removeFlowTime = function(btn) {
 // ========== 预约/编辑 ==========
 selectOption = function(type) {
     if (isReadOnly) return;
-    verifyPassword(() => {
     selectedOption = type;
     isEditMode = false;
     
@@ -1337,7 +1328,6 @@ selectOption = function(type) {
     
     document.getElementById('reserveSubmitBtn').disabled = true;
     showPage('page-reserve');
-    });
 };
 
 editEvent = function(id) {
@@ -1566,7 +1556,6 @@ checkReserveSubmit = function() {
 // ========== 事件操作 ==========
 handleEventAction = function(id, action) {
     if (isReadOnly) return;
-    verifyPassword(() => {
     const record = scheduleData.find(r => r.id === id);
     if (!record) return;
 
@@ -1640,11 +1629,10 @@ handleEventAction = function(id, action) {
             saveDataToCOS();
         }
     }
-    });
 };
 
 // 预约表单提交
-document.getElementById('reserveForm').addEventListener('submit', function(e) {
+document.getElementById('reserveForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (isReadOnly) return;
     const formData = new FormData(this);
@@ -1809,12 +1797,11 @@ document.getElementById('reserveForm').addEventListener('submit', function(e) {
         });
     }
 
-    goHome();
-    saveDataToCOS();
+    await saveDataAndGoHome();
 });
 
 // 综艺演播室填单表单
-document.getElementById('studioForm').addEventListener('submit', function(e) {
+document.getElementById('studioForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (isReadOnly) return;
     const formData = new FormData(this);
@@ -1863,12 +1850,11 @@ document.getElementById('studioForm').addEventListener('submit', function(e) {
         record.status = 'filled';
     });
 
-    goHome();
-    saveDataToCOS();
+    await saveDataAndGoHome();
 });
 
 // 外场填单表单
-document.getElementById('outsideForm').addEventListener('submit', function(e) {
+document.getElementById('outsideForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (isReadOnly) return;
     const formData = new FormData(this);
@@ -1915,12 +1901,11 @@ document.getElementById('outsideForm').addEventListener('submit', function(e) {
         record.status = 'filled';
     });
 
-    goHome();
-    saveDataToCOS();
+    await saveDataAndGoHome();
 });
 
 // 南大堂填单表单
-document.getElementById('nanDaTangForm').addEventListener('submit', function(e) {
+document.getElementById('nanDaTangForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (isReadOnly) return;
     const formData = new FormData(this);
@@ -1967,8 +1952,7 @@ document.getElementById('nanDaTangForm').addEventListener('submit', function(e) 
         record.status = 'filled';
     });
 
-    goHome();
-    saveDataToCOS();
+    await saveDataAndGoHome();
 });
 
 // 其他服务表单
